@@ -1,10 +1,10 @@
 import dbConnect from '../../../lib/db';
-import { check_organization_ownership } from "../../../../lib/organizations/check_organization_ownership";
-import { find_organization_by_id } from "../../../../lib/organizations/find_organization_by_id";
-import { update_organization_member } from "../../../../lib/organizations/update_organization_member";
-import { update_user_guest_organization } from "../../../../lib/users/update_user_guest_organizations";
-import { create_new_user } from "../../../../lib/users/create_new_user";
-const User = require("../../models/usersModel");
+import { check_organization_ownership } from "../../../lib/api/organizations/check_organization_ownership";
+import { find_organization_by_id } from "../../../lib/api/organizations/find_organization_by_id";
+import { update_organization_member } from "../../../lib/api/organizations/update_organization_member";
+import { update_user_guest_organization } from "../../../lib/api/users/update_user_guest_organizations";
+import { create_new_user } from "../../../lib/api/users/create_new_user";
+import User from '../../../models/usersModel';
 
 async function handler(req, res) {
 	if (req.method === "POST") {

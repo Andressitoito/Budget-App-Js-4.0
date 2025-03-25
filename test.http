@@ -1,0 +1,29 @@
+# test.rest
+POST http://localhost:3000/api/organizations/create_new_organization
+Content-Type: application/json
+
+{
+  "organization": "TestOrg",
+  "user": {
+    "name": "Andres",
+    "email": "andres@example.com",
+    "given_name": "Andres",
+    "family_name": "Test",
+    "picture": "https://example.com/pic.jpg"
+  }
+}
+
+### test.rest
+POST http://localhost:3000/api/organizations/join_organization
+Content-Type: application/json
+
+{
+  "user": {
+    "name": "Maria",
+    "email": "maria@example.com",
+    "given_name": "Maria",
+    "family_name": "Test",
+    "picture": "https://example.com/maria.jpg"
+  },
+  "organization_id": "67e1d3a399a9e38332b60431"
+}
