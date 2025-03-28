@@ -2,11 +2,11 @@
   "name": "budget-app-js-4.0",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "node server.js",
-    "build": "next build",
-    "start": "NODE_ENV=production node server.js",
-    "lint": "next lint"
+  "scripts":{
+      "dev": "NODE_ENV=development node server.js",
+      "build": "next build",
+      "start": "NODE_ENV=production node server.js",
+      "lint": "next lint"
   },
   "dependencies": {
     "mongoose": "^8.12.2",
