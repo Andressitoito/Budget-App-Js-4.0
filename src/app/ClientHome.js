@@ -28,7 +28,12 @@ export default function ClientHome({ initialOrgs, initialCategories, initialTran
     });
     socket.on('newTransaction', (transaction) => {
       console.log('New transaction received:', transaction);
-      addTransaction(transaction);
+      // Only add if not already in state
+      addTransaction((state) => {
+        const exists = state.transactions.some(t => t._id === transaction._id);
+        if (!exists) return { transactions: [...state.transactions, transaction] };
+        return state; // No change if duplicate
+      });
     });
     socket.on('connect_error', (err) => {
       console.error('Socket connection error:', err);

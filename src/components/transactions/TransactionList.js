@@ -1,21 +1,22 @@
-// components/transactions/TransactionList.js
+// src/components/transactions/TransactionList.js
 import useAppStore from '../../stores/appStore';
 
 export default function TransactionList() {
   const { transactions } = useAppStore();
+
+  console.log('TransactionList transactions:', transactions);
+
   return (
-    <div className="mt-4">
-      <h3 className="text-lg font-semibold">Transactions</h3>
-      {Array.isArray(transactions) && transactions.length ? (
-        <ul className="mt-2">
-          {transactions.map((tx) => (
-            <li key={tx._id} className="py-1">
-              {tx.item} - {tx.price} by {tx.username} on {new Date(tx.date).toLocaleString()}
-            </li>
+    <div>
+      <h3>Transactions</h3>
+      {transactions.length ? (
+        <ul>
+          {transactions.map((transaction) => (
+            <li key={transaction._id}>{transaction.item} - ${transaction.price}</li>
           ))}
         </ul>
       ) : (
-        <p>No transactions yet.</p>
+        <p>No transactions found.</p>
       )}
     </div>
   );
