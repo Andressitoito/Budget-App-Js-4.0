@@ -1,16 +1,16 @@
-// stores/appStore.js
+// src/stores/appStore.js
 import { create } from 'zustand';
 
-export const useAppStore = create((set) => ({
+const useAppStore = create((set) => ({
   selectedOrgId: null,
   categories: [],
   transactions: [],
-  setSelectedOrgId: (orgId) => set({ selectedOrgId: orgId }),
+  setSelectedOrgId: (id) => set({ selectedOrgId: id }),
   setCategories: (categories) => set({ categories }),
-  setTransactions: (transactions) => set({ transactions }), // Full overwrite
+  setTransactions: (transactions) => set({ transactions }),
   addTransaction: (transaction) => set((state) => ({
-    transactions: Array.isArray(state.transactions) ? [...state.transactions, transaction] : [transaction],
-  })), // Incremental add
+    transactions: [...state.transactions, transaction],
+  })),
 }));
 
 export default useAppStore;
