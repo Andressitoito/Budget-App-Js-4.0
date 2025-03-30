@@ -3,12 +3,12 @@ POST http://localhost:3000/api/organizations/create_new_organization
 Content-Type: application/json
 
 {
-  "organization": "TestOrg",
+  "organization": "TestDatabaseBudget",
   "user": {
     "name": "Andres",
     "email": "andres@example.com",
     "given_name": "Andres",
-    "family_name": "Test",
+    "family_name": "Ledesma",
     "picture": "https://example.com/pic.jpg"
   }
 }
@@ -25,5 +25,29 @@ Content-Type: application/json
     "family_name": "Test",
     "picture": "https://example.com/maria.jpg"
   },
-  "organization_id": "67e1d3a399a9e38332b60431"
+  "organization_id": "67e75bdcce7a69f18481f8cf"
 }
+
+### test.rest
+POST http://localhost:3000/api/categories/create_category
+Content-Type: application/json
+
+{
+  "category": "Food",
+  "organization_id": "67e75bdcce7a69f18481f8cf",
+  "base_amount": 1000
+}
+
+### test.rest
+POST http://localhost:3000/api/transactions/create_transaction
+Content-Type: application/json
+
+{
+  "category_id": "67e75c2cce7a69f18481f8e8",
+  "organization_id": "67e75bdcce7a69f18481f8cf",
+  "username": "Andres",
+  "item": "Coffee",
+  "price": 500
+}
+
+

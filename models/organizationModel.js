@@ -25,48 +25,44 @@ const organizationSchema = new mongoose.Schema({
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      required: true,
     },
     role: {
       type: String,
       enum: ['owner', 'admin', 'member'],
-      default: 'member'
+      default: 'member',
     },
     joinedAt: {
       type: Date,
-      default: Date.now
-    }
+      default: Date.now,
+    },
   }],
-  remaining_budget: {
-    type: Number,
-    default: function() {
-      return this.main_budget;
-    }
-  }
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  toObject: { virtuals: true },
 });
 
-// Virtual for spent budget
-organizationSchema.virtual('spent_budget').get(function() {
-  return this.main_budget - this.remaining_budget;
+// Virtual for spent budget (sum of transactions)
+organizationSchema.virtual('spent_budget').get(async function () {
+  const Transaction = mongoose.model('Transaction');
+  const transactions = await Transaction.find({ organization_id: this._id, status: 'completed' });
+  return transactions.reduce((sum, tx) => sum + (tx.effective_amount || 0), 0);
 });
 
-// Pre-save middleware
-organizationSchema.pre('save', function(next) {
-  if (this.isNew) {
-    // Set initial remaining budget
-    this.remaining_budget = this.main_budget;
-    
-    // Set first user as owner
-    if (this.users.length === 0 && this.organization_owner) {
-      this.users.push({
-        user: this.organization_owner,
-        role: 'owner'
-      });
-    }
+// Virtual for remaining budget
+organizationSchema.virtual('remaining_budget').get(async function () {
+  const spent = await this.spent_budget;
+  return this.main_budget - spent;
+});
+
+// Pre-save middleware (only for owner setup)
+organizationSchema.pre('save', function (next) {
+  if (this.isNew && this.organization_owner && this.users.length === 0) {
+    this.users.push({
+      user: this.organization_owner,
+      role: 'owner',
+    });
   }
   next();
 });

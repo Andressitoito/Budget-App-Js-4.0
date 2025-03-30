@@ -1,46 +1,14 @@
-import dbConnect from '../../../lib/db';
+import { createTransaction } from '../../../lib/api/transactions/create_transaction';
 
-const {
-	create_transaction,
-} = require("../../../../lib/transactions/create_transaction");
-
-async function handler(req, res) {
-	if (req.method === "POST") {
-		////////////////////////////////
-		// DECLARE GLOBAL VARIABLES
-		////////////////////////////////
-		const { transaction } = req.body;
-
-		let saved_transaction;
-
-		////////////////////////////////
-		// CONNECT TO THE DATABASE
-		////////////////////////////////
-		await dbConnect();
-
-		////////////////////////////////
-		// CREATE TRANSACTION
-		////////////////////////////////
-		try {
-			saved_transaction = await create_transaction(transaction);
-		} catch (error) {
-			return res.status(421).json({
-				status: 421,
-				message: "Something went wrong creating a new transaction",
-				error: error.toString(),
-			});
-		}
-
-		////////////////////////////////
-		// SEND RESPONSE
-		// TRANSACTION
-		////////////////////////////////
-		res.status(201).json({
-			status: 201,
-			message: "The transaction was successfully created",
-			new_transaction: saved_transaction,
-		});
-	}
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
+  try {
+		console.log("route hit", req.body);
+    const savedTransaction = await createTransaction(req.body);
+    res.status(201).json({ message: 'Transaction created', transaction: savedTransaction });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 }
-
-export default handler;

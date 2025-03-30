@@ -1,50 +1,46 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const categorySchema = new mongoose.Schema({
-  category_name: {
-    type: String,
-    required: [true, 'A category must have a name'],
-    trim: true,
-  },
-  organization_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Organization',
-    required: [true, 'A category must belong to an organization'],
-  },
-  base_amount: {
-    type: Number,
-    required: [true, 'A category must have a base amount'],
-    default: 0,
-  },
-  remaining_amount: {
-    type: Number,
-    required: [true, 'A category must have a remaining amount'],
-    default: 0,
-  },
-  transactions: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Transaction',
-  }],
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+const categorySchema = new mongoose.Schema(
+	{
+		category_name: {
+			type: String,
+			required: [true, "A category must have a name"],
+			trim: true,
+		},
+		organization_id: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Organization",
+			required: [true, "A category must belong to an organization"],
+		},
+		base_amount: {
+			type: Number,
+			required: [true, "A category must have a base amount"],
+			default: 0,
+		},
+		transactions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Transaction" }],
+	},
+	{
+		timestamps: true,
+		toJSON: { virtuals: true },
+		toObject: { virtuals: true },
+	}
+);
+
+// Virtuals (async due to population)
+categorySchema.virtual("spent_amount").get(async function () {
+	if (!this.populated("transactions")) {
+		await this.populate("transactions");
+	}
+	return this.transactions.reduce(
+		(sum, tx) => sum + (tx.effective_amount || 0),
+		0
+	);
 });
 
-// Add any virtual fields here if needed
-categorySchema.virtual('spent_amount').get(function() {
-  return this.base_amount - this.remaining_amount;
+categorySchema.virtual("remaining_amount").get(async function () {
+	const spent = await this.spent_amount;
+	return this.base_amount - spent;
 });
 
-// Add any pre/post hooks here if needed
-categorySchema.pre('save', function(next) {
-  if (this.isNew) {
-    this.remaining_amount = this.base_amount;
-  }
-  next();
-});
-
-const Category = mongoose.models.Category || mongoose.model('Category', categorySchema);
-
-export default Category;
-
+export default mongoose.models.Category ||
+	mongoose.model("Category", categorySchema);
