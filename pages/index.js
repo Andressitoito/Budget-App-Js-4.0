@@ -51,7 +51,7 @@ export default function Home({ initialOrgs, initialCategories, initialTransactio
 
   return (
     <div className="p-5">
-      <h1 className="text-3xl font-bold">Budget App Js 4.0</h1>
+      <h1 className="text-3xl font-bold bg-blue-400">Budget App Js 4.0</h1>
       {initialOrgs.length ? (
         <>
           <h2 className="text-xl mt-4">Organization: {initialOrgs.find(org => org._id === selectedOrgId)?.organization}</h2>
