@@ -8,7 +8,11 @@ import CategoryList from '../components/category/CategoryList';
 import TransactionList from '../components/transactions/TransactionList';
 
 export default function ClientHome({ initialOrgs, initialCategories, initialTransactions, selectedOrgId }) {
-  const { setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions } = useAppStore();
+  const { 
+    setSelectedOrgId, setCategories, setTransactions, 
+    addTransaction, removeTransactions, removeTransaction, 
+    addCategory, removeCategory, updateCategory 
+  } = useAppStore();
 
   console.log('ClientHome props:', { initialOrgs, initialCategories, initialTransactions, selectedOrgId });
 
@@ -34,11 +38,30 @@ export default function ClientHome({ initialOrgs, initialCategories, initialTran
       console.log(`Transactions deleted for category ${category_id}, count: ${deletedCount}`);
       removeTransactions(category_id);
     });
+    socket.on('newCategory', (category) => {
+      console.log('New category received:', category);
+      addCategory(category);
+    });
+    socket.on('categoryDeleted', ({ category_id }) => {
+      console.log(`Category deleted: ${category_id}`);
+      removeCategory(category_id);
+      removeTransactions(category_id);
+    });
+    socket.on('categoryUpdated', (updatedCategory) => {
+      console.log('Category updated:', updatedCategory);
+      updateCategory(updatedCategory);
+    });
     socket.on('connect_error', (err) => {
       console.error('Socket connection error:', err);
     });
+
     return () => socket.disconnect();
-  }, [selectedOrgId, initialCategories, initialTransactions, setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions]);
+  }, [
+    selectedOrgId, initialCategories, initialTransactions, 
+    setSelectedOrgId, setCategories, setTransactions, 
+    addTransaction, removeTransactions, removeTransaction, 
+    addCategory, removeCategory, updateCategory
+  ]);
 
   console.log('Rendering with initialOrgs.length:', initialOrgs.length);
 
