@@ -11,8 +11,8 @@ export async function POST(req) {
     const savedTransaction = await createTransaction(body);
 
     if (global.io) {
-      console.log('Emitting newTransaction:', savedTransaction._id); // Debug
       global.io.to(body.organization_id).emit('newTransaction', savedTransaction.toObject());
+      console.log(`Emitted newTransaction to org ${body.organization_id}`);
     }
 
     return new Response(JSON.stringify({ message: 'Transaction created', transaction: savedTransaction.toObject() }), {

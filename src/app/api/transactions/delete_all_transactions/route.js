@@ -1,39 +1,39 @@
-import dbConnect from '../../../lib/db';
-import { deleteAllTransactions } from '../../../lib/api/transactions/delete_transactions';
+import dbConnect from '../../../../lib/db';
+import { delete_all_transactions } from '../../../../lib/api/transactions/delete_all_transactions';
 
-export default async function handler(req, res) {
-  if (req.method !== 'DELETE') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
+export async function DELETE(req) {
   try {
-    const { category_id } = req.body;
+    const { category_id, organization_id } = await req.json();
 
     if (!category_id) {
-      return res.status(400).json({
+      return new Response(JSON.stringify({
         status: 400,
         message: 'Category ID is required'
+      }), { status: 400 });
+    } 
+
+    await dbConnect();
+    const result = await delete_all_transactions(category_id);
+
+    if (global.io) {
+      global.io.to(organization_id).emit('transactionsDeleted', { 
+        category_id,
+        deletedCount: result.deletedCount 
       });
+      console.log(`Emitted transactionsDeleted to org ${organization_id}`);
     }
 
-    // Connect to the database
-    await dbConnect();
-
-    // Delete all transactions for the category
-    const result = await deleteAllTransactions(category_id);
-
-    return res.status(200).json({
+    return new Response(JSON.stringify({
       status: 200,
       message: `Successfully deleted ${result.deletedCount} transactions`,
       data: result
-    });
-
+    }), { status: 200 });
   } catch (error) {
     console.error('Error deleting transactions:', error);
-    return res.status(500).json({
+    return new Response(JSON.stringify({
       status: 500,
       message: 'Error deleting transactions',
       error: error.message
-    });
+    }), { status: 500 });
   }
 }

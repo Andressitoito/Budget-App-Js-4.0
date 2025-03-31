@@ -8,7 +8,7 @@ import CategoryList from '../components/category/CategoryList';
 import TransactionList from '../components/transactions/TransactionList';
 
 export default function ClientHome({ initialOrgs, initialCategories, initialTransactions, selectedOrgId }) {
-  const { setSelectedOrgId, setCategories, setTransactions, addTransaction } = useAppStore();
+  const { setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions } = useAppStore();
 
   console.log('ClientHome props:', { initialOrgs, initialCategories, initialTransactions, selectedOrgId });
 
@@ -28,18 +28,17 @@ export default function ClientHome({ initialOrgs, initialCategories, initialTran
     });
     socket.on('newTransaction', (transaction) => {
       console.log('New transaction received:', transaction);
-      // Only add if not already in state
-      addTransaction((state) => {
-        const exists = state.transactions.some(t => t._id === transaction._id);
-        if (!exists) return { transactions: [...state.transactions, transaction] };
-        return state; // No change if duplicate
-      });
+      addTransaction(transaction);
+    });
+    socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
+      console.log(`Transactions deleted for category ${category_id}, count: ${deletedCount}`);
+      removeTransactions(category_id);
     });
     socket.on('connect_error', (err) => {
       console.error('Socket connection error:', err);
     });
     return () => socket.disconnect();
-  }, [selectedOrgId, initialCategories, initialTransactions, setSelectedOrgId, setCategories, setTransactions, addTransaction]);
+  }, [selectedOrgId, initialCategories, initialTransactions, setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions]);
 
   console.log('Rendering with initialOrgs.length:', initialOrgs.length);
 

@@ -1,7 +1,9 @@
-const Transaction = require("../../pages/api/models/transactionModel");
+import Transaction from "../../../models/transactionModel";
+import dbConnect from "../../db";
 
 export const delete_all_transactions = async (category_id) => {
 	try {
+		await dbConnect();
 		const result = await Transaction.deleteMany({
 			category_id: category_id,
 		});

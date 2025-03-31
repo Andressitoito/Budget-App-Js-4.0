@@ -1,39 +1,36 @@
-import dbConnect from '../../../lib/db';
-import { updateCategoryBaseAmount } from '../../../lib/api/categories/update_category';
+import dbConnect from '../../../../lib/db';
+import { updateCategoryBaseAmount } from '../../../../lib/api/categories/update_category';
 
-export default async function handler(req, res) {
-  if (req.method !== 'PUT') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
+export async function PUT(req) {
   try {
-    const { category_id, new_base_amount } = req.body;
+    const { category_id, new_base_amount, organization_id } = await req.json();
 
-    if (!category_id || typeof new_base_amount !== 'number') {
-      return res.status(400).json({
+    if (!category_id || typeof new_base_amount !== 'number' || !organization_id) {
+      return new Response(JSON.stringify({
         status: 400,
-        message: 'Category ID and new base amount are required. Base amount must be a number.'
-      });
+        message: 'Category ID, organization ID and valid base amount are required'
+      }), { status: 400 });
     }
 
-    // Connect to the database
     await dbConnect();
-
-    // Update category base amount
     const updatedCategory = await updateCategoryBaseAmount(category_id, new_base_amount);
 
-    return res.status(200).json({
+    if (global.io) {
+      global.io.to(organization_id).emit('categoryBaseAmountUpdated', updatedCategory.toObject());
+      console.log(`Emitted categoryBaseAmountUpdated to org ${organization_id}`);
+    }
+
+    return new Response(JSON.stringify({
       status: 200,
       message: 'Base amount updated successfully',
-      data: updatedCategory
-    });
-
+      data: updatedCategory.toObject()
+    }), { status: 200 });
   } catch (error) {
-    console.error('Error updating category base amount:', error);
-    return res.status(500).json({
+    console.error('Error updating base amount:', error);
+    return new Response(JSON.stringify({
       status: 500,
-      message: 'Error updating category base amount',
+      message: 'Error updating base amount',
       error: error.message
-    });
+    }), { status: 500 });
   }
 }

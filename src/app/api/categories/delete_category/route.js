@@ -1,38 +1,41 @@
-import dbConnect from '../../../lib/db';
-import { deleteCategory } from '../../../lib/api/categories/delete_category';
+import dbConnect from '../../../../lib/db';
+import { deleteCategory } from '../../../../lib/api/categories/delete_category';
 
-export default async function handler(req, res) {
-  if (req.method !== 'DELETE') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
+export async function DELETE(req) {
   try {
-    const { category_id } = req.query;
+    const { searchParams } = new URL(req.url);
+    const category_id = searchParams.get('category_id');
+    const organization_id = searchParams.get('organization_id');
 
-    if (!category_id) {
-      return res.status(400).json({
+    if (!category_id || !organization_id) {
+      return new Response(JSON.stringify({
         status: 400,
-        message: 'Category ID is required'
-      });
+        message: 'Category ID and Organization ID are required'
+      }), { status: 400 });
     }
 
-    // Connect to the database
     await dbConnect();
-
-    // Delete category and get deletion results
     const result = await deleteCategory(category_id);
 
-    return res.status(200).json({
+    if (global.io) {
+      global.io.to(organization_id).emit('categoryDeleted', { 
+        category_id,
+        deletedTransactions: result.deletedTransactions 
+      });
+      console.log(`Emitted categoryDeleted to org ${organization_id}`);
+    }
+
+    return new Response(JSON.stringify({
       status: 200,
-      message: `Category and ${result.deletedTransactions} associated transactions were successfully deleted`,
+      message: `Category and ${result.deletedTransactions} transactions deleted`,
       data: result
-    });
+    }), { status: 200 });
   } catch (error) {
     console.error('Error deleting category:', error);
-    return res.status(500).json({
+    return new Response(JSON.stringify({
       status: 500,
       message: 'Error deleting category',
       error: error.message
-    });
+    }), { status: 500 });
   }
 }

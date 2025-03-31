@@ -1,39 +1,36 @@
-import dbConnect from '../../../lib/db';
-import { createCategory } from '../../../lib/api/categories/create_category';
+import dbConnect from '../../../../lib/db';
+import { createCategory } from '../../../../lib/api/categories/create_category';
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ status: 405, message: 'Method not allowed' });
-  }
-
-  const { category, organization_id, base_amount } = req.body;
-  console.log('Request body:', req.body);
-
+export async function POST(req) {
   try {
+    const { category, organization_id, base_amount } = await req.json();
     await dbConnect();
 
-    // Validate input
     if (!category || !organization_id || base_amount === undefined) {
-      return res.status(400).json({
+      return new Response(JSON.stringify({
         status: 400,
         message: 'Category name, organization ID, and base amount are required',
-      });
+      }), { status: 400 });
     }
 
-    // Create new category
     const savedCategory = await createCategory({ category_name: category, organization_id, base_amount });
 
-    return res.status(201).json({
+    if (global.io) {
+      global.io.to(organization_id).emit('categoryCreated', savedCategory.toObject());
+      console.log(`Emitted categoryCreated to org ${organization_id}`);
+    }
+
+    return new Response(JSON.stringify({
       status: 201,
-      message: `Category ${category} was successfully created and saved`,
-      category: savedCategory,
-    });
+      message: `Category ${category} was successfully created`,
+      category: savedCategory.toObject(),
+    }), { status: 201 });
   } catch (error) {
     console.error('Error creating category:', error);
-    return res.status(500).json({
+    return new Response(JSON.stringify({
       status: 500,
       message: 'Error creating category',
       error: error.message,
-    });
+    }), { status: 500 });
   }
 }

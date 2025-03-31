@@ -1,43 +1,31 @@
-import dbConnect from '../../../lib/db';
+import dbConnect from '../../../../lib/db';
 import { update_transaction } from "../../../../lib/transactions/update_transaction";
 
-async function handler(req, res) {
-	if (req.method === "PUT") {
-		////////////////////////////////
-		// DECLARE GLOBAL VARIABLES
-		////////////////////////////////
-		const { transaction_id, transaction_item, transaction_price } = req.body;
+export async function PUT(req) {
+  try {
+    const { transaction_id, transaction_item, transaction_price, organization_id } = await req.json();
+    await dbConnect();
+    
+    const updatedTransaction = await update_transaction(
+      transaction_id,
+      transaction_item,
+      transaction_price
+    );
 
-		////////////////////////////////
-		// CONNECT TO THE DATABASE
-		////////////////////////////////
-		await dbConnect();
+    if (global.io) {
+      global.io.to(organization_id).emit('transactionUpdated', updatedTransaction.toObject());
+      console.log(`Emitted transactionUpdated to org ${organization_id}`);
+    }
 
-		////////////////////////////////
-		// DELETE TRANSACTION
-		////////////////////////////////
-		try {
-			await update_transaction(
-				transaction_id,
-				transaction_item,
-				transaction_price
-			);
-		} catch (error) {
-			return res.status(422).json({
-				status: 422,
-				message: "Something went wrong updating transaction",
-				error: error.toString(),
-			});
-		}
-
-		////////////////////////////////
-		// SEND RESPONSE
-		////////////////////////////////
-		res.status(200).json({
-			status: 200,
-			message: `${transaction_item} was successfully updated`,
-		});
-	}
+    return new Response(JSON.stringify({
+      status: 200,
+      message: `${transaction_item} was successfully updated`,
+    }), { status: 200 });
+  } catch (error) {
+    return new Response(JSON.stringify({
+      status: 422,
+      message: "Something went wrong updating transaction",
+      error: error.toString(),
+    }), { status: 422 });
+  }
 }
-
-export default handler;
