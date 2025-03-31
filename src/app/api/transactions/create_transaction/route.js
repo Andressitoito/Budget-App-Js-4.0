@@ -10,16 +10,11 @@ export async function POST(req) {
     console.log("route hit", body);
 
     const savedTransaction = await createTransaction(body);
-
-    // Fetch updated category
     const updatedCategory = await Category.findById(body.category_id).lean();
 
     if (global.io) {
-      // Emit new transaction
       global.io.to(body.organization_id).emit('newTransaction', savedTransaction.toObject());
-      // Emit updated category
       global.io.to(body.organization_id).emit('categoryUpdated', updatedCategory);
-      console.log(`Emitted newTransaction and categoryUpdated to org ${body.organization_id}`);
     }
 
     return new Response(JSON.stringify({ message: 'Transaction created', transaction: savedTransaction.toObject() }), {

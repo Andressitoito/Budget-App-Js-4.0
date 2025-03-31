@@ -17,6 +17,14 @@ const categorySchema = new mongoose.Schema(
 			required: [true, "A category must have a base amount"],
 			default: 0,
 		},
+		spent_amount: {
+			type: Number,
+			default: 0
+		}, // Tracks total spent
+		remaining_budget: {
+			type: Number,
+			default: 0
+		},
 		transactions: [{ type: mongoose.Schema.Types.ObjectId, ref: "Transaction" }],
 	},
 	{
@@ -25,22 +33,6 @@ const categorySchema = new mongoose.Schema(
 		toObject: { virtuals: true },
 	}
 );
-
-// Virtuals (async due to population)
-categorySchema.virtual("spent_amount").get(async function () {
-	if (!this.populated("transactions")) {
-		await this.populate("transactions");
-	}
-	return this.transactions.reduce(
-		(sum, tx) => sum + (tx.effective_amount || 0),
-		0
-	);
-});
-
-categorySchema.virtual("remaining_amount").get(async function () {
-	const spent = await this.spent_amount;
-	return this.base_amount - spent;
-});
 
 export default mongoose.models.Category ||
 	mongoose.model("Category", categorySchema);

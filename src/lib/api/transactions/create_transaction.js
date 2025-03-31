@@ -6,7 +6,6 @@ export async function createTransaction({ category_id, organization_id, username
     throw new Error('Missing required fields');
   }
 
-  // Create the transaction
   const transaction = new Transaction({
     category_id,
     organization_id,
@@ -17,12 +16,11 @@ export async function createTransaction({ category_id, organization_id, username
   });
   await transaction.save();
 
-  // Update category base_amount
+  // Update category
   const category = await Category.findById(category_id);
-  if (!category) {
-    throw new Error('Category not found');
-  }
-  category.base_amount -= price; // Subtract price
+  if (!category) throw new Error('Category not found');
+  category.spent_amount += price;
+  category.remaining_budget = category.base_amount - category.spent_amount;
   await category.save();
 
   return transaction;
