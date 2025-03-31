@@ -1,20 +1,35 @@
 // src/app/ClientHome.js
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import io from 'socket.io-client';
 import useAppStore from '../stores/appStore';
 import CategoryList from '../components/category/CategoryList';
-import TransactionList from '../components/transactions/TransactionList';
+import Modal from '../components/Modal';
 
 export default function ClientHome({ initialOrgs, initialCategories, initialTransactions, selectedOrgId }) {
   const { 
     setSelectedOrgId, setCategories, setTransactions, 
     addTransaction, removeTransactions, removeTransaction, 
-    addCategory, removeCategory, updateCategory 
+    addCategory, removeCategory, updateCategory, updateTransaction 
   } = useAppStore();
 
-  console.log('ClientHome props:', { initialOrgs, initialCategories, initialTransactions, selectedOrgId });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState(null);
+
+  const createConfig = {
+    title: 'Create Category',
+    fields: [
+      { label: 'Name', name: 'category', type: 'text', placeholder: 'Category Name' },
+      { label: 'Base Amount', name: 'base_amount', type: 'number', placeholder: 'Base Amount' },
+    ],
+    endpoint: '/api/categories/create_category',
+    method: 'POST',
+    action: 'create category',
+    initialData: { category: '', base_amount: 0 },
+    organization_id: selectedOrgId,
+    submitLabel: 'Create',
+  };
 
   useEffect(() => {
     setSelectedOrgId(selectedOrgId);
@@ -51,6 +66,14 @@ export default function ClientHome({ initialOrgs, initialCategories, initialTran
       console.log('Category updated:', updatedCategory);
       updateCategory(updatedCategory);
     });
+    socket.on('transactionUpdated', (transaction) => {
+      console.log('Transaction updated:', transaction);
+      updateTransaction(transaction);
+    });
+    socket.on('transactionDeleted', ({ transaction_id }) => {
+      console.log('Transaction deleted:', transaction_id);
+      removeTransaction(transaction_id);
+    });
     socket.on('connect_error', (err) => {
       console.error('Socket connection error:', err);
     });
@@ -60,7 +83,7 @@ export default function ClientHome({ initialOrgs, initialCategories, initialTran
     selectedOrgId, initialCategories, initialTransactions, 
     setSelectedOrgId, setCategories, setTransactions, 
     addTransaction, removeTransactions, removeTransaction, 
-    addCategory, removeCategory, updateCategory
+    addCategory, removeCategory, updateCategory, updateTransaction
   ]);
 
   console.log('Rendering with initialOrgs.length:', initialOrgs.length);
@@ -71,12 +94,19 @@ export default function ClientHome({ initialOrgs, initialCategories, initialTran
       {initialOrgs.length ? (
         <>
           <h2 className="text-xl mt-4">Organization: {initialOrgs.find(org => org._id === selectedOrgId)?.organization || 'Unknown'}</h2>
+          <button style={{ backgroundColor: 'green' }} onClick={() => { setModalConfig(createConfig); setIsModalOpen(true); }}>New Category</button>
           <CategoryList />
-          <TransactionList />
         </>
       ) : (
         <p className="mt-4">No organizations found. Create one to get started!</p>
       )}
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        config={modalConfig}
+        onSubmit={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }
