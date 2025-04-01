@@ -10,19 +10,6 @@ export default function CategoryBox({ category }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
 
-  const baseAmountConfig = {
-    title: 'Edit Base Amount',
-    fields: [
-      { label: 'Base Amount', name: 'base_amount', type: 'number', value: category.base_amount },
-    ],
-    endpoint: '/api/categories/update_base_amount',
-    method: 'POST',
-    action: 'update base amount',
-    initialData: { category_id: category._id, base_amount: category.base_amount },
-    organization_id: category.organization_id,
-    submitLabel: 'Save',
-  };
-
   const editConfig = {
     title: 'Edit Category',
     fields: [
@@ -49,18 +36,14 @@ export default function CategoryBox({ category }) {
   };
 
   const openModal = (type) => {
-    setModalConfig(
-      type === 'base' ? baseAmountConfig :
-      type === 'edit' ? editConfig : deleteConfig
-    );
+    setModalConfig(type === 'edit' ? editConfig : deleteConfig);
     setIsModalOpen(true);
   };
 
   return (
     <div>
-      <h4>{category.name}</h4>
+      <h2 className="text-2xl font-bold">{category.name}</h2>
       <p>Base Amount: ${category.base_amount}</p>
-      <button onClick={() => openModal('base')}>Edit Base Amount</button>
       <button style={{ backgroundColor: 'yellow' }} onClick={() => openModal('edit')}>Edit</button>
       <button style={{ backgroundColor: 'red' }} onClick={() => openModal('delete')}>Delete</button>
       <ul>

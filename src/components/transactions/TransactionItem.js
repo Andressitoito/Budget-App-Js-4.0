@@ -1,6 +1,7 @@
 // src/components/transactions/TransactionItem.js
 import { useState } from 'react';
-import Modal from '../modals/Modal';
+import { FiEdit, FiTrash2 } from 'react-icons/fi';
+import Modal from '../Modal';
 
 export default function TransactionItem({ transaction }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,10 +38,26 @@ export default function TransactionItem({ transaction }) {
   };
 
   return (
-    <li>
-      {transaction.item} - ${transaction.price}
-      <button onClick={() => openModal('edit')}>Edit</button>
-      <button onClick={() => openModal('delete')}>Delete</button>
+    <li className="bg-white p-4 rounded-md shadow-md flex justify-between items-center hover:bg-green-50 transition">
+      <div>
+        <p className="font-semibold text-blue-700">{transaction.username}</p>
+        <p className="text-sm text-gray-500">{new Date(transaction.date).toLocaleString()}</p>
+        <p className="text-gray-700">{transaction.item}</p>
+      </div>
+      <div className="flex space-x-2">
+        <button
+          className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
+          onClick={() => openModal('edit')}
+        >
+          <FiEdit size={16} />
+        </button>
+        <button
+          className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
+          onClick={() => openModal('delete')}
+        >
+          <FiTrash2 size={16} />
+        </button>
+      </div>
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

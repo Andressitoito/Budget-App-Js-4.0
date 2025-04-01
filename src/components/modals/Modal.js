@@ -1,21 +1,19 @@
 // src/components/Modal.js
-import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 
 export default function Modal({ isOpen, onClose, config, onSubmit }) {
   if (!isOpen) return null;
 
-  const [formData, setFormData] = useState(config.initialData || {});
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    defaultValues: config.initialData || {},
+  });
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async () => {
+  const submitHandler = async (data) => {
     try {
       const response = await fetch(config.endpoint, {
         method: config.method || 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, organization_id: config.organization_id }),
+        body: JSON.stringify({ ...data, organization_id: config.organization_id }),
       });
       if (!response.ok) throw new Error(`Failed to ${config.action}`);
       onSubmit(await response.json());
@@ -26,22 +24,45 @@ export default function Modal({ isOpen, onClose, config, onSubmit }) {
   };
 
   return (
-    <div style={{ position: 'fixed', top: '20%', left: '20%', width: '60%', background: 'white', padding: '20px', border: '1px solid #ccc' }}>
-      <h3>{config.title}</h3>
-      {config.fields.map((field) => (
-        <div key={field.name}>
-          <label>{field.label}</label>
-          <input
-            type={field.type}
-            name={field.name}
-            value={formData[field.name] || ''}
-            onChange={handleChange}
-            placeholder={field.placeholder}
-          />
-        </div>
-      ))}
-      <button onClick={handleSubmit}>{config.submitLabel || 'Submit'}</button>
-      <button onClick={onClose}>Cancel</button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h3 className="text-xl font-bold mb-4">{config.title}</h3>
+        <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
+          {config.fields.map((field) => (
+            <div key={field.name}>
+              <label className="block text-sm font-medium text-gray-700">{field.label}</label>
+              <input
+                type={field.type}
+                {...register(field.name, {
+                  required: `${field.label} is required`,
+                  valueAsNumber: field.type === 'number',
+                  validate: field.type === 'text' ? (value) => value.trim().length > 0 || 'Cannot be empty or just spaces' : null,
+                })}
+                className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder={field.placeholder}
+              />
+              {errors[field.name] && (
+                <p className="text-red-500 text-sm mt-1">{errors[field.name].message}</p>
+              )}
+            </div>
+          ))}
+          <div className="flex justify-end space-x-2">
+            <button
+              type="submit"
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            >
+              {config.submitLabel || 'Submit'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

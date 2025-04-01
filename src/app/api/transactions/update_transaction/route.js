@@ -1,31 +1,32 @@
+// src/app/api/transactions/update_transaction/route.js
+import { updateTransaction } from '../../../../lib/api/transactions/update_transaction';
 import dbConnect from '../../../../lib/db';
-import { update_transaction } from "../../../../lib/transactions/update_transaction";
 
-export async function PUT(req) {
+export async function POST(req) {
   try {
-    const { transaction_id, transaction_item, transaction_price, organization_id } = await req.json();
     await dbConnect();
-    
-    const updatedTransaction = await update_transaction(
-      transaction_id,
-      transaction_item,
-      transaction_price
-    );
+    const { transaction_id, item, price, organization_id } = await req.json();
+
+    if (!transaction_id || !item || price === undefined) {
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
+    }
+
+    const updatedTransaction = await updateTransaction({ transaction_id, item, price });
 
     if (global.io) {
       global.io.to(organization_id).emit('transactionUpdated', updatedTransaction.toObject());
-      console.log(`Emitted transactionUpdated to org ${organization_id}`);
+      global.io.to(organization_id).emit('categoryUpdated', category.toObject());
+      console.log(`Emitted transactionUpdated and categoryUpdated to org ${organization_id}`);
     }
 
     return new Response(JSON.stringify({
-      status: 200,
-      message: `${transaction_item} was successfully updated`,
+      message: `${item} was successfully updated`,
+      transaction: updatedTransaction.toObject(),
     }), { status: 200 });
   } catch (error) {
+    console.error('Error updating transaction:', error);
     return new Response(JSON.stringify({
-      status: 422,
-      message: "Something went wrong updating transaction",
-      error: error.toString(),
-    }), { status: 422 });
+      error: error.message,
+    }), { status: error.message === 'Missing required fields' ? 400 : 500 });
   }
 }

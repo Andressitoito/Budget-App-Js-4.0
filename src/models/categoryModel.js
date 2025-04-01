@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const categorySchema = new mongoose.Schema(
 	{
-		category_name: {
+		name: {
 			type: String,
 			required: [true, "A category must have a name"],
 			trim: true,
