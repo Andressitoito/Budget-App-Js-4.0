@@ -1,4 +1,4 @@
-// src/components/Modal.js
+// src/components/modals/Modal.js
 import { useForm } from 'react-hook-form';
 
 export default function Modal({ isOpen, onClose, config, onSubmit }) {
@@ -24,9 +24,9 @@ export default function Modal({ isOpen, onClose, config, onSubmit }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h3 className="text-xl font-bold mb-4">{config.title}</h3>
+        <h3 className="text-xl font-bold mb-4 text-gray-800">{config.title}</h3>
         <form onSubmit={handleSubmit(submitHandler)} className="space-y-4">
           {config.fields.map((field) => (
             <div key={field.name}>
@@ -38,8 +38,9 @@ export default function Modal({ isOpen, onClose, config, onSubmit }) {
                   valueAsNumber: field.type === 'number',
                   validate: field.type === 'text' ? (value) => value.trim().length > 0 || 'Cannot be empty or just spaces' : null,
                 })}
-                className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="mt-1 block w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder={field.placeholder}
+                defaultValue={field.value}
               />
               {errors[field.name] && (
                 <p className="text-red-500 text-sm mt-1">{errors[field.name].message}</p>
@@ -49,7 +50,7 @@ export default function Modal({ isOpen, onClose, config, onSubmit }) {
           <div className="flex justify-end space-x-2">
             <button
               type="submit"
-              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
             >
               {config.submitLabel || 'Submit'}
             </button>

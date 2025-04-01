@@ -1,12 +1,16 @@
 // src/app/layout.js
-"use client";
-
-import './globals.css';
+import QueryClientWrapper from '../components/QueryClientWrapper/QueryClientWrapper';
+import Layout from '../components/layout/Layout';
+import '../app/globals.css';
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className="bg-blue-500">
+      <body>
+        <QueryClientWrapper>
+          <Layout>{children}</Layout>
+        </QueryClientWrapper>
+      </body>
     </html>
   );
 }

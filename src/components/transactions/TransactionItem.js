@@ -1,68 +1,114 @@
 // src/components/transactions/TransactionItem.js
 import { useState } from 'react';
 import { FiEdit, FiTrash2 } from 'react-icons/fi';
-import Modal from '../Modal';
+import Modal from '../modals/Modal';
+import { useMutation } from '@tanstack/react-query';
 
-export default function TransactionItem({ transaction }) {
+export default function TransactionItem({ transaction, refetchTransactions }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
 
-  const editConfig = {
-    title: 'Edit Transaction',
-    fields: [
-      { label: 'Item', name: 'item', type: 'text', value: transaction.item },
-      { label: 'Price', name: 'price', type: 'number', value: transaction.price },
-    ],
-    endpoint: '/api/transactions/update_transaction',
-    method: 'POST',
-    action: 'update transaction',
-    initialData: { transaction_id: transaction._id, item: transaction.item, price: transaction.price },
-    organization_id: transaction.organization_id,
-    submitLabel: 'Save',
-  };
+  const updateTransactionMutation = useMutation({
+    mutationFn: async (data) => {
+      const res = await fetch('/api/transactions/update_transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update transaction');
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchTransactions();
+    },
+  });
 
-  const deleteConfig = {
-    title: 'Confirm Delete',
-    fields: [],
-    endpoint: '/api/transactions/delete_transaction',
-    method: 'DELETE',
-    action: 'delete transaction',
-    initialData: { transaction_id: transaction._id },
-    organization_id: transaction.organization_id,
-    submitLabel: 'Delete',
-  };
-
-  const openModal = (type) => {
-    setModalConfig(type === 'edit' ? editConfig : deleteConfig);
-    setIsModalOpen(true);
-  };
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (data) => {
+      const res = await fetch('/api/transactions/delete_transaction', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to delete transaction');
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchTransactions();
+    },
+  });
 
   return (
-    <li className="bg-white p-4 rounded-md shadow-md flex justify-between items-center hover:bg-green-50 transition">
+    <li className="bg-gray-50 p-4 rounded-md shadow-sm flex justify-between items-center">
       <div>
-        <p className="font-semibold text-blue-700">{transaction.username}</p>
-        <p className="text-sm text-gray-500">{new Date(transaction.date).toLocaleString()}</p>
-        <p className="text-gray-700">{transaction.item}</p>
+        <p className="font-medium text-gray-800">{transaction.item}</p>
+        <p className="text-gray-600">${transaction.price}</p>
+        <p className="text-gray-500 text-sm">{new Date(transaction.date).toLocaleDateString()}</p>
       </div>
       <div className="flex space-x-2">
         <button
-          className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
-          onClick={() => openModal('edit')}
+          className="text-gray-600 hover:text-blue-600"
+          onClick={() => {
+            setModalConfig({
+              title: 'Edit Transaction',
+              fields: [
+                { label: 'Item', name: 'item', type: 'text', value: transaction.item },
+                { label: 'Price', name: 'price', type: 'number', value: transaction.price },
+              ],
+              endpoint: '/api/transactions/update_transaction',
+              method: 'POST',
+              action: 'update transaction',
+              initialData: {
+                transaction_id: transaction._id,
+                item: transaction.item,
+                price: transaction.price,
+              },
+              organization_id: transaction.organization_id,
+              submitLabel: 'Save',
+            });
+            setIsModalOpen(true);
+          }}
         >
           <FiEdit size={16} />
         </button>
         <button
-          className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
-          onClick={() => openModal('delete')}
+          className="text-gray-600 hover:text-red-600"
+          onClick={() => {
+            setModalConfig({
+              title: 'Confirm Delete Transaction',
+              fields: [],
+              endpoint: '/api/transactions/delete_transaction',
+              method: 'DELETE',
+              action: 'delete transaction',
+              initialData: { transaction_id: transaction._id },
+              organization_id: transaction.organization_id,
+              submitLabel: 'Delete',
+            });
+            setIsModalOpen(true);
+          }}
         >
           <FiTrash2 size={16} />
         </button>
       </div>
+
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         config={modalConfig}
-        onSubmit={() => setIsModalOpen(false)}
+        onSubmit={() => {
+          if (modalConfig?.action === 'update transaction') {
+            updateTransactionMutation.mutate({
+              ...modalConfig.initialData,
+              organization_id: transaction.organization_id,
+            });
+          } else if (modalConfig?.action === 'delete transaction') {
+            deleteTransactionMutation.mutate({
+              ...modalConfig.initialData,
+              organization_id: transaction.organization_id,
+            });
+          }
+          setIsModalOpen(false);
+        }}
       />
     </li>
   );
