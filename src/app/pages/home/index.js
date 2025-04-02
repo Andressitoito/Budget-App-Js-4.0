@@ -15,7 +15,7 @@ import { AiOutlinePlus, AiOutlineEdit, AiOutlineDelete } from 'react-icons/ai';
 // Dynamic import for Modal, SSR disabled
 const Modal = dynamic(() => import('../../../components/modals/Modal'), { ssr: false });
 
-export default function Home({ initialOrgs, initialCategories = [], initialTransactions = [], selectedOrgId }) {
+export default function Home({ initialCategories = [], initialTransactions = [], selectedOrgId }) {
   const { 
     categories: storeCategories, 
     transactions: storeTransactions, 
@@ -32,7 +32,6 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
     console.log('start use effect');
     console.log('Initial categories:', initialCategories);
 
-    // Set initial data only on first mount
     if (isInitialMount.current) {
       setSelectedOrgId(selectedOrgId);
       setCategories(initialCategories);
@@ -73,9 +72,7 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
       removeTransactions(category_id);
       const newCategories = storeCategories.filter(c => c._id !== category_id);
       setCategories(newCategories);
-      console.log('Categories after deletion:', storeCategories);
-      console.log('Transactions after deletion:', storeTransactions);
-      console.log('New categories:', newCategories);
+      console.log('Categories after deletion:', newCategories);
       setSelectedCategory(newCategories[0] || null);
     });
     socket.on('categoryUpdated', (updatedCategory) => {
@@ -89,7 +86,8 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
     socket.on('transactionUpdated', (transaction) => {
       console.log('Transaction updated:', transaction);
       updateTransaction(transaction);
-      setTransactions([...storeTransactions]);
+      const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
+      setTransactions(updatedTransactions); // Force UI refresh with updated array
     });
     socket.on('transactionDeleted', ({ transaction_id }) => {
       console.log('Transaction deleted:', transaction_id);
@@ -117,7 +115,7 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
     const newIndex = storeCategories.findIndex(c => c._id === over.id);
     if (oldIndex !== -1 && newIndex !== -1) {
       const reordered = arrayMove(storeCategories, oldIndex, newIndex);
-      setCategories(reordered);
+      setCategories([...reordered]); // Ensure fresh array for re-render
     }
   };
 
