@@ -1,53 +1,60 @@
-import mongoose from "mongoose";
-import validate from "mongoose-validator";
-
-const urlValidator = [
-  validate({
-    validator: "isURL",
-    message: "Please enter a valid URL",
-  }),
-];
-
-const emailValidator = [
-  validate({
-    validator: "isEmail",
-    message: "Please enter a valid email address",
-  }),
-];
+// src/models/usersModel.js
+import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "A user must have a name"],
+      required: [true, 'A user must have a name'],
       trim: true,
     },
     given_name: {
       type: String,
-      required: [true, "A user must have a first name"],
+      required: [true, 'A user must have a first name'],
       trim: true,
     },
     family_name: {
       type: String,
-      required: [true, "A user must have a last name"],
+      required: [true, 'A user must have a last name'],
       trim: true,
     },
     email: {
       type: String,
-      required: [true, "A user must have an email"],
+      required: [true, 'A user must have an email'],
       unique: true,
-      validate: emailValidator,
+      lowercase: true,
+      validate: {
+        validator: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+        message: 'Please enter a valid email address',
+      },
     },
-    picture: { type: String, validate: urlValidator },
+    picture: {
+      type: String,
+      validate: {
+        validator: (value) => /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(value),
+        message: 'Please enter a valid URL',
+      },
+    },
     organizations: [
       {
         organization: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "Organization",
+          ref: 'Organization',
           required: true,
         },
-        role: { type: String, enum: ["owner", "admin", "member"], required: true },
+        role: { type: String, enum: ['owner', 'member'], required: true }, // Simplified roles
         joinedAt: { type: Date, default: Date.now },
+      },
+    ],
+    defaultOrgId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      default: null, // For auto-login
+    },
+    categoryOrder: [
+      {
+        organizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
+        order: [String], // Array of category _ids
       },
     ],
     lastLogin: { type: Date, default: Date.now },
@@ -59,7 +66,7 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-userSchema.virtual("fullName").get(function () {
+userSchema.virtual('fullName').get(function () {
   return `${this.given_name} ${this.family_name}`;
 });
 
@@ -76,6 +83,6 @@ userSchema.methods.getRoleInOrganization = function (organizationId) {
   return org ? org.role : null;
 };
 
-const User = mongoose.models.User || mongoose.model("User", userSchema);
+const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 export default User;

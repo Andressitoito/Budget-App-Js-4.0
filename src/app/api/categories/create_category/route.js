@@ -7,8 +7,6 @@ export async function POST(req) {
     await dbConnect();
     const { name, base_amount, organization_id } = await req.json();
 
-    console.log('Creating category:', { name, organization_id, base_amount });
-
     if (!name || !organization_id || base_amount === undefined) {
       return new Response(JSON.stringify({ error: 'Name, base amount, and organization ID required' }), { status: 400 });
     }

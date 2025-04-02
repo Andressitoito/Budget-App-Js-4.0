@@ -9,11 +9,13 @@ import CategoryList from '../../../components/category/CategoryList';
 import TransactionList from '../../../components/transactions/TransactionList';
 import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig } from './configs';
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineDelete } from 'react-icons/ai';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
 
 // Dynamic import for Modal, SSR disabled
 const Modal = dynamic(() => import('../../../components/modals/Modal'), { ssr: false });
 
-export default function Home({ initialCategories = [], initialTransactions = [], selectedOrgId }) {
+export default function Home({ initialOrgs, initialCategories = [], initialTransactions = [], selectedOrgId: initialOrgId }) {
   const { 
     categories: storeCategories, 
     transactions: storeTransactions, 
@@ -24,12 +26,11 @@ export default function Home({ initialCategories = [], initialTransactions = [],
   const [selectedCategory, setSelectedCategory] = useState(initialCategories[0] || null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
+  const [selectedOrgId, setLocalOrgId] = useState(initialOrgId);
   const isInitialMount = useRef(true);
+  const router = useRouter();
 
   useEffect(() => {
-    console.log('start use effect');
-    console.log('Initial categories:', initialCategories);
-
     if (isInitialMount.current) {
       setSelectedOrgId(selectedOrgId);
       setCategories(initialCategories);
@@ -112,7 +113,8 @@ export default function Home({ initialCategories = [], initialTransactions = [],
     const reorderedCategories = [...storeCategories];
     const [movedCategory] = reorderedCategories.splice(source.index, 1);
     reorderedCategories.splice(destination.index, 0, movedCategory);
-    setCategories(reorderedCategories); // Fresh array for UI update
+    setCategories(reorderedCategories);
+    // Update categoryOrder in DB (future step)
   };
 
   const openCreateModal = () => {
@@ -120,16 +122,59 @@ export default function Home({ initialCategories = [], initialTransactions = [],
     setIsModalOpen(true);
   };
 
+  const openDeleteAllModal = () => {
+    setModalConfig({
+      title: 'Confirm Delete All Transactions',
+      fields: [],
+      endpoint: '/api/transactions/delete_all_transactions',
+      method: 'DELETE',
+      action: 'delete all transactions',
+      initialData: { category_id: selectedCategory?._id, organization_id: selectedOrgId },
+      organization_id: selectedOrgId,
+      submitLabel: 'Delete All',
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOrgChange = async (orgId, setAsDefault = false) => {
+    setLocalOrgId(orgId);
+    setSelectedOrgId(orgId);
+    if (setAsDefault) {
+      await fetch('/api/users/set_default_org', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId }),
+      });
+      toast.success('Default organization updated');
+    }
+    router.push(`/dashboard?orgId=${orgId}`);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex justify-center">
-      <CategoryList
-        categories={storeCategories}
-        selectedCategory={selectedCategory}
-        onSelect={setSelectedCategory}
-        openCreateModal={openCreateModal}
-        onDragEnd={handleDragEnd}
-      />
-      <div className="w-1/2 p-6 flex flex-col items-center relative mt-16 z-0">
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center">
+      <div className="w-full max-w-4xl p-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Organizations</h2>
+        <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+          {initialOrgs.map(org => (
+            <div key={org._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+              <span className="text-gray-700">{org.name} ({org.owner.toString() === userId ? 'Owner' : 'Member'})</span>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={org._id === selectedOrgId}
+                  onChange={() => handleOrgChange(org._id, true)}
+                  className="form-checkbox h-5 w-5 text-blue-600"
+                />
+                <button
+                  className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600"
+                  onClick={() => handleOrgChange(org._id)}
+                >
+                  Go
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
         {selectedCategory ? (
           <>
             <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-md text-center relative">
@@ -161,7 +206,15 @@ export default function Home({ initialCategories = [], initialTransactions = [],
                 </button>
               </div>
             </div>
-            <div className="mt-6 w-full max-w-md">
+            <div className="mt-6 w-full max-w-md relative">
+              {storeTransactions.filter(t => t.category_id === selectedCategory._id).length > 0 && (
+                <button
+                  className="absolute top-0 right-0 -mt-12 mr-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
+                  onClick={openDeleteAllModal}
+                >
+                  <AiOutlineDelete size={20} />
+                </button>
+              )}
               <TransactionList
                 transactions={storeTransactions}
                 categoryId={selectedCategory._id}

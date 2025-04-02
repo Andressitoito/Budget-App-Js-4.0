@@ -1,66 +1,30 @@
-import dbConnect from '../../../lib/db';
-import { random_message } from "../../../../lib/signin/random_message";
-const User = require("../../models/usersModel");
-const jwt = require("jsonwebtoken");
+// src/app/api/users/signin/route.js
+import { google } from 'googleapis';
+import { createToken } from '../../../../lib/auth';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+export async function POST(req) {
+  try {
+    const { code } = await req.json();
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      'http://localhost:3000/auth/callback'
+    );
 
-console.log("JWT ", JWT_SECRET)
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
 
-async function handler(req, res) {
-	if (req.method === "POST") {
-		//////////////////////////////////
-		// DECLARE GLOBAL VARIABLES
-		//////////////////////////////////
-		let email = req.body;
-		let user;
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const { data } = await oauth2.userinfo.get();
 
-		//////////////////////////////////
-		// CONNECT TO THE DATABASE
-		//////////////////////////////////
-		await dbConnect();
-
-		//////////////////////////////////
-		// CHECK USER
-		//////////////////////////////////
-		try {
-			const userData = await User.findOne({ email: email });
-
-			if (userData?.email === email) {
-				user = userData;
-			} else {
-				throw new Error(
-					`This user ${email} is not registered, please Signup and try again!`
-				);
-			}
-		} catch (error) {
-			return res.status(403).json({
-				status: 403,
-				message: "Invalid user",
-				error: error.toString(),
-			});
-		}
-
-		//////////////////////////////////
-		// GET RANDOM MESSAGE
-		//////////////////////////////////
-		const message = random_message(user.given_name);
-
-		//////////////////////////////////
-		// GENERATE JWT TOKEN
-		//////////////////////////////////
-		const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: '1000h' });
-
-		//////////////////////////////////
-		// SEND RESPONSE USER
-		//////////////////////////////////
-		res.status(200).json({
-			status: 200,
-			message: message,
-			user: user,
-			token: token
-		});
-	}
+    const { name, email, given_name, family_name, picture } = data;
+    const jwtToken = createToken({ email, name, given_name, family_name, picture });
+    return new Response(JSON.stringify({ message: 'Signed in', user: data }), {
+      status: 200,
+      headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Strict` },
+    });
+  } catch (error) {
+    console.error('Error signing in:', error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  }
 }
-
-export default handler;

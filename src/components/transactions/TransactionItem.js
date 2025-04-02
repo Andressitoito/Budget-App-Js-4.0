@@ -55,13 +55,13 @@ export default function TransactionItem({ transaction }) {
       </div>
       <div className="flex space-x-2">
         <button
-          className="text-gray-600 hover:text-blue-600"
+          className="bg-blue-400 text-white p-2 rounded-full hover:bg-blue-500"
           onClick={() => openModal('edit')}
         >
           <AiOutlineEdit size={16} />
         </button>
         <button
-          className="text-gray-600 hover:text-red-600"
+          className="bg-red-400 text-white p-2 rounded-full hover:bg-red-500"
           onClick={() => openModal('delete')}
         >
           <AiOutlineDelete size={16} />

@@ -1,78 +1,48 @@
-import dbConnect from '../../../lib/db';
-import { create_new_user } from "../../../../lib/api/users/create_new_user";
-import { find_organization_by_id } from "../../../../lib/api/organizations/find_organization_by_id";
-import { find_user_by_email } from "../../../../lib/api/users/find_user_by_email";
+// src/app/api/users/create_new_user/route.js
+import dbConnect from '../../../../lib/db';
+import { User, Organization } from '../../../../lib/models';
+import { createToken } from '../../../../lib/auth';
 
-async function handler(req, res) {
-	if (req.method === "POST") {
-		////////////////////////////////
-		// DECLARE GLOBAL VARIABLES
-		////////////////////////////////
-		const { organization_id, user } = req.body;
+export async function POST(req) {
+  try {
+    const { name, email, given_name, family_name, picture, organizationId, organizationName, token, joinOrg } = await req.json();
 
-		let saved_user;
-		let organization;
+    if (token !== process.env.AUTH_TOKEN) {
+      return new Response(JSON.stringify({ error: 'Invalid verification token' }), { status: 403 });
+    }
 
-		////////////////////////////////
-		// CONNECT TO THE DATABASE
-		////////////////////////////////
-		await dbConnect();
+    await dbConnect();
 
-		////////////////////////////////
-		// FIND USER BY EMAIL
-		////////////////////////////////
-		try {
-			await find_user_by_email(user.email, res);
-		} catch (error) {
-			return res.status(401).json({
-				status: 401,
-				error: error.toString(),
-			});
-		}
+    let user = await User.findOne({ email });
+    if (user) {
+      return new Response(JSON.stringify({ error: 'User already exists' }), { status: 400 });
+    }
 
-		////////////////////////////////
-		// FIND ORGANIZATION BY ID
-		////////////////////////////////
-		try {
-			organization = await find_organization_by_id(organization_id);
-			console.log("This is organization", organization);
-		} catch (error) {
-			return res.status(422).json({
-				status: 422,
-				error: error.toString(),
-			});
-		}
+    user = new User({ name, email, given_name, family_name, picture });
+    let org;
 
-		////////////////////////////////
-		// DEFINE USER PATH TRUE / FALSE
-		////////////////////////////////
-		if (user.organization_owner) {
-			////////////////////////////////
-			// PATH USER TRUE
-			////////////////////
-			console.log("This is an OWNER");
-		} else {
-			////////////////////////////////
-			// PATH USER FALSE
-			////////////////////
-			console.log("This is NOT an OWNER");
+    if (joinOrg) {
+      org = await Organization.findById(organizationId);
+      if (!org) {
+        return new Response(JSON.stringify({ error: 'Organization not found' }), { status: 404 });
+      }
+      user.organizations.push({ organization: org._id, role: 'member' });
+    } else {
+      org = new Organization({ name: organizationName, owner: user._id });
+      await org.save();
+      user.organizations.push({ organization: org._id, role: 'owner' });
+      user.defaultOrgId = org._id; // Auto-set default for creator
+    }
 
-			////////////////////////////////
-			// CREATE AND SAVE NEW USER
-			////////////////////////////////
-			saved_user = await create_new_user(user, organization_id, organization, res);
-		}
+    await user.save();
 
-		////////////////////////////////
-		// SEND RESPONSE
-		// USER
-		////////////////////////////////
-		res.status(201).json({
-			status: 201,
-			message: `New user ${user.name} has been successfully created and saved`,
-			user: saved_user,
-		});
-	}
+    const jwtToken = createToken(user);
+    return new Response(JSON.stringify({ message: 'User created', userId: user._id, orgId: org._id }), {
+      status: 201,
+      headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Strict` },
+    });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  }
 }
-
-export default handler;
