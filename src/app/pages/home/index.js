@@ -2,8 +2,6 @@
 "use client";
 
 import { useEffect, useState, useRef } from 'react';
-import { DndContext, closestCenter } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
 import io from 'socket.io-client';
 import useAppStore from '../../../stores/appStore';
 import dynamic from 'next/dynamic';
@@ -87,7 +85,7 @@ export default function Home({ initialCategories = [], initialTransactions = [],
       console.log('Transaction updated:', transaction);
       updateTransaction(transaction);
       const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
-      setTransactions(updatedTransactions); // Force UI refresh with updated array
+      setTransactions(updatedTransactions);
     });
     socket.on('transactionDeleted', ({ transaction_id }) => {
       console.log('Transaction deleted:', transaction_id);
@@ -107,16 +105,14 @@ export default function Home({ initialCategories = [], initialTransactions = [],
     storeCategories, storeTransactions
   ]);
 
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+  const handleDragEnd = (result) => {
+    const { source, destination } = result;
+    if (!destination || source.index === destination.index) return;
 
-    const oldIndex = storeCategories.findIndex(c => c._id === active.id);
-    const newIndex = storeCategories.findIndex(c => c._id === over.id);
-    if (oldIndex !== -1 && newIndex !== -1) {
-      const reordered = arrayMove(storeCategories, oldIndex, newIndex);
-      setCategories([...reordered]); // Ensure fresh array for re-render
-    }
+    const reorderedCategories = [...storeCategories];
+    const [movedCategory] = reorderedCategories.splice(source.index, 1);
+    reorderedCategories.splice(destination.index, 0, movedCategory);
+    setCategories(reorderedCategories); // Fresh array for UI update
   };
 
   const openCreateModal = () => {
@@ -126,57 +122,56 @@ export default function Home({ initialCategories = [], initialTransactions = [],
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <CategoryList
-          categories={storeCategories}
-          selectedCategory={selectedCategory}
-          onSelect={setSelectedCategory}
-          openCreateModal={openCreateModal}
-        />
-        <div className="w-1/2 p-6 flex flex-col items-center relative mt-16 z-0">
-          {selectedCategory ? (
-            <>
-              <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-md text-center relative">
-                <h3 className="text-2xl font-bold text-blue-700 mb-2">{selectedCategory.name}</h3>
-                <p className="text-lg">Base Amount: <span className="font-semibold">${selectedCategory.base_amount}</span></p>
-                <p className="text-lg">
-                  Remaining: <span className={`font-semibold ${selectedCategory.remaining_budget < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                    ${selectedCategory.remaining_budget}
-                  </span>
-                </p>
+      <CategoryList
+        categories={storeCategories}
+        selectedCategory={selectedCategory}
+        onSelect={setSelectedCategory}
+        openCreateModal={openCreateModal}
+        onDragEnd={handleDragEnd}
+      />
+      <div className="w-1/2 p-6 flex flex-col items-center relative mt-16 z-0">
+        {selectedCategory ? (
+          <>
+            <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-md text-center relative">
+              <h3 className="text-2xl font-bold text-blue-700 mb-2">{selectedCategory.name}</h3>
+              <p className="text-lg">Base Amount: <span className="font-semibold">${selectedCategory.base_amount}</span></p>
+              <p className="text-lg">
+                Remaining: <span className={`font-semibold ${selectedCategory.remaining_budget < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                  ${selectedCategory.remaining_budget}
+                </span>
+              </p>
+              <button
+                className="mt-4 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
+                onClick={() => { setModalConfig(createTransactionConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
+              >
+                <AiOutlinePlus size={20} />
+              </button>
+              <div className="absolute top-4 right-4 flex space-x-2">
                 <button
-                  className="mt-4 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
-                  onClick={() => { setModalConfig(createTransactionConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
+                  className="bg-yellow-500 text-white p-2 rounded-full hover:bg-yellow-600"
+                  onClick={() => { setModalConfig(editCategoryConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
                 >
-                  <AiOutlinePlus size={20} />
+                  <AiOutlineEdit size={20} />
                 </button>
-                <div className="absolute top-4 right-4 flex space-x-2">
-                  <button
-                    className="bg-yellow-500 text-white p-2 rounded-full hover:bg-yellow-600"
-                    onClick={() => { setModalConfig(editCategoryConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
-                  >
-                    <AiOutlineEdit size={20} />
-                  </button>
-                  <button
-                    className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
-                    onClick={() => { setModalConfig(deleteCategoryConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
-                  >
-                    <AiOutlineDelete size={20} />
-                  </button>
-                </div>
+                <button
+                  className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
+                  onClick={() => { setModalConfig(deleteCategoryConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
+                >
+                  <AiOutlineDelete size={20} />
+                </button>
               </div>
-              <div className="mt-6 w-full max-w-md">
-                <TransactionList
-                  transactions={storeTransactions}
-                  categoryId={selectedCategory._id}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-gray-500">Select a category to view details</p>
-          )}
-        </div>
-      </DndContext>
+            </div>
+            <div className="mt-6 w-full max-w-md">
+              <TransactionList
+                transactions={storeTransactions}
+                categoryId={selectedCategory._id}
+              />
+            </div>
+          </>
+        ) : (
+          <p className="text-gray-500">Select a category to view details</p>
+        )}
+      </div>
       {isModalOpen && (
         <Modal
           isOpen={isModalOpen}
