@@ -29,5 +29,3 @@ export async function GET(req) {
     });
   }
 }
-
-git commit -m "Enable Automatic Tailwind CSS Processing with Next.js" -m "This commit finalizes the Tailwind CSS setup for the Budget App Js 4.0 project by enabling automatic CSS processing with Next.js’s development server. Previously, we were using a hardcoded \`tailwind.css\` file (manually built with \`npx tailwindcss -i ./src/app/globals.css -o ./public/tailwind.css\`), which required manual rebuilding for style changes to take effect. This commit reverts that workaround and configures Tailwind CSS 3.4.14 to work seamlessly with Next.js’s built-in CSS processing pipeline, allowing style changes to be applied in real-time during development via hot reloading.

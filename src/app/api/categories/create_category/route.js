@@ -1,36 +1,38 @@
+// src/app/api/categories/create_category/route.js
 import dbConnect from '../../../../lib/db';
-import { createCategory } from '../../../../lib/api/categories/create_category';
+import { Category } from '../../../../lib/models';
 
 export async function POST(req) {
   try {
-    const { category, organization_id, base_amount } = await req.json();
     await dbConnect();
+    const { name, base_amount, organization_id } = await req.json();
 
-    if (!category || !organization_id || base_amount === undefined) {
-      return new Response(JSON.stringify({
-        status: 400,
-        message: 'Category name, organization ID, and base amount are required',
-      }), { status: 400 });
+    console.log('Creating category:', { name, organization_id, base_amount });
+
+    if (!name || !organization_id || base_amount === undefined) {
+      return new Response(JSON.stringify({ error: 'Name, base amount, and organization ID required' }), { status: 400 });
     }
 
-    const savedCategory = await createCategory({ category_name: category, organization_id, base_amount });
+    const category = new Category({
+      name,
+      base_amount,
+      spent_amount: 0,
+      remaining_budget: base_amount,
+      organization_id,
+    });
+    await category.save();
 
     if (global.io) {
-      global.io.to(organization_id).emit('categoryCreated', savedCategory.toObject());
-      console.log(`Emitted categoryCreated to org ${organization_id}`);
+      global.io.to(organization_id).emit('newCategory', category.toObject());
+      console.log(`Emitted newCategory to org ${organization_id}`);
     }
 
     return new Response(JSON.stringify({
-      status: 201,
-      message: `Category ${category} was successfully created`,
-      category: savedCategory.toObject(),
+      message: `Category ${name} was successfully created`,
+      category: category.toObject(),
     }), { status: 201 });
   } catch (error) {
     console.error('Error creating category:', error);
-    return new Response(JSON.stringify({
-      status: 500,
-      message: 'Error creating category',
-      error: error.message,
-    }), { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

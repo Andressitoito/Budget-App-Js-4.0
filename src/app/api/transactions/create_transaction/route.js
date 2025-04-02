@@ -1,31 +1,44 @@
 // src/app/api/transactions/create_transaction/route.js
-import { createTransaction } from '../../../../lib/api/transactions/create_transaction';
-import { Category } from '../../../../lib/models';
 import dbConnect from '../../../../lib/db';
+import { Transaction, Category } from '../../../../lib/models';
 
 export async function POST(req) {
   try {
     await dbConnect();
-    const body = await req.json();
-    console.log("route hit", body);
+    const { category_id, organization_id, username, item, price } = await req.json();
 
-    const savedTransaction = await createTransaction(body);
-    const updatedCategory = await Category.findById(body.category_id).lean();
-
-    if (global.io) {
-      global.io.to(body.organization_id).emit('newTransaction', savedTransaction.toObject());
-      global.io.to(body.organization_id).emit('categoryUpdated', updatedCategory);
+    if (!category_id || !organization_id || !username || !item || price === undefined) {
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }
 
-    return new Response(JSON.stringify({ message: 'Transaction created', transaction: savedTransaction.toObject() }), {
-      status: 201,
-      headers: { 'Content-Type': 'application/json' },
+    const transaction = new Transaction({
+      category_id,
+      organization_id,
+      username,
+      item,
+      price,
+      date: new Date(),
     });
+    await transaction.save();
+
+    const category = await Category.findById(category_id);
+    if (!category) throw new Error('Category not found');
+    category.spent_amount += price;
+    category.remaining_budget = category.base_amount - category.spent_amount;
+    await category.save();
+
+    if (global.io) {
+      global.io.to(organization_id).emit('newTransaction', transaction.toObject());
+      global.io.to(organization_id).emit('categoryUpdated', category.toObject());
+      console.log(`Emitted newTransaction and categoryUpdated to org ${organization_id}`);
+    }
+
+    return new Response(JSON.stringify({
+      message: 'Transaction created',
+      transaction: transaction.toObject(),
+    }), { status: 201 });
   } catch (error) {
     console.error('Error creating transaction:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: error.message === 'Missing required fields' ? 400 : 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

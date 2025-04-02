@@ -1,30 +1,38 @@
+// src/app/api/transactions/delete_transaction/route.js
 import dbConnect from '../../../../lib/db';
-import { delete_transaction } from "../../../../lib/transactions/delete_transaction";
+import { Transaction, Category } from '../../../../lib/models';
 
-export async function POST(req) {
+export async function DELETE(req) {
   try {
-    const { transaction_id, transaction_item, organization_id } = await req.json();
     await dbConnect();
-    
-    await delete_transaction(transaction_id);
+    const { transaction_id, organization_id } = await req.json();
 
-    if (global.io) {
-      global.io.to(organization_id).emit('transactionDeleted', { 
-        transaction_id,
-        transaction_item 
-      });
-      console.log(`Emitted transactionDeleted to org ${organization_id}`);
+    if (!transaction_id || !organization_id) {
+      return new Response(JSON.stringify({ error: 'Transaction ID and organization ID required' }), { status: 400 });
     }
 
-    return new Response(JSON.stringify({
-      status: 200,
-      message: `${transaction_item} was successfully deleted`,
-    }), { status: 200 });
+    const transaction = await Transaction.findById(transaction_id);
+    if (!transaction) throw new Error('Transaction not found');
+
+    const category = await Category.findById(transaction.category_id);
+    if (category) {
+      category.spent_amount -= transaction.price;
+      category.remaining_budget = category.base_amount - category.spent_amount;
+      await category.save();
+    }
+
+    await Transaction.deleteOne({ _id: transaction_id });
+
+    if (global.io) {
+      global.io.to(organization_id).emit('transactionDeleted', { transaction_id });
+      if (category) {
+        global.io.to(organization_id).emit('categoryUpdated', category.toObject());
+      }
+    }
+
+    return new Response(JSON.stringify({ message: 'Transaction deleted' }), { status: 200 });
   } catch (error) {
-    return new Response(JSON.stringify({
-      status: 422,
-      message: "Something went wrong deleting transaction",
-      error: error.toString(),
-    }), { status: 422 });
+    console.error('Error deleting transaction:', error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

@@ -7,6 +7,8 @@ export async function POST(req) {
     await dbConnect();
     const { transaction_id, item, price, organization_id } = await req.json();
 
+    console.log('Updating transaction:', { transaction_id, item, price, organization_id });
+
     if (!transaction_id || !item || price === undefined) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }
@@ -15,8 +17,7 @@ export async function POST(req) {
 
     if (global.io) {
       global.io.to(organization_id).emit('transactionUpdated', updatedTransaction.toObject());
-      global.io.to(organization_id).emit('categoryUpdated', category.toObject());
-      console.log(`Emitted transactionUpdated and categoryUpdated to org ${organization_id}`);
+      console.log(`Emitted transactionUpdated to org ${organization_id}`);
     }
 
     return new Response(JSON.stringify({

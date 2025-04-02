@@ -1,5 +1,4 @@
-import Transaction from '../../../models/transactionModel';
-import Category from '../../../models/categoryModel';
+import { Transaction, Category } from "src/lib/models";
 
 export const delete_category = async (category_id) => {
 	try {

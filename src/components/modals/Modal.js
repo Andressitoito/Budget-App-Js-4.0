@@ -1,4 +1,7 @@
 // src/components/modals/Modal.js
+"use client";
+
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 
 export default function Modal({ isOpen, onClose, config, onSubmit }) {
@@ -7,19 +10,24 @@ export default function Modal({ isOpen, onClose, config, onSubmit }) {
   const { register, handleSubmit, formState: { errors } } = useForm({
     defaultValues: config.initialData || {},
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   const submitHandler = async (data) => {
+    setIsLoading(true);
     try {
       const response = await fetch(config.endpoint, {
         method: config.method || 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, organization_id: config.organization_id }),
+        body: JSON.stringify({ ...config.initialData, ...data, organization_id: config.organization_id }),
       });
       if (!response.ok) throw new Error(`Failed to ${config.action}`);
-      onSubmit(await response.json());
+      const result = await response.json();
+      onSubmit(result);
       onClose();
     } catch (error) {
       console.error(`Error ${config.action}:`, error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -50,8 +58,17 @@ export default function Modal({ isOpen, onClose, config, onSubmit }) {
           <div className="flex justify-end space-x-2">
             <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+              disabled={isLoading}
+              className={`bg-blue-600 text-white px-4 py-2 rounded-md flex items-center justify-center ${
+                isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+              }`}
             >
+              {isLoading ? (
+                <svg className="animate-spin h-5 w-5 mr-2 text-white" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h-8z" />
+                </svg>
+              ) : null}
               {config.submitLabel || 'Submit'}
             </button>
             <button

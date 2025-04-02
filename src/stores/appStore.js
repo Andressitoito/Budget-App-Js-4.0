@@ -29,6 +29,9 @@ const useAppStore = create((set) => ({
   updateCategory: (updatedCategory) => set((state) => ({
     categories: state.categories.map(c => c._id === updatedCategory._id ? updatedCategory : c),
   })),
+  updateTransaction: (updatedTransaction) => set((state) => ({
+    transactions: state.transactions.map(t => t._id === updatedTransaction._id ? updatedTransaction : t),
+  })),
 }));
 
 export default useAppStore;

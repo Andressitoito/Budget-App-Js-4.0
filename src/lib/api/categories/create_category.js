@@ -1,10 +1,9 @@
-import Category from '../../../models/categoryModel';
-import Organization from '../../../models/organizationModel';
+import { Category, Organization } from "src/lib/models";
 
 export async function createCategory(categoryData) {
-  const { category_name, organization_id, base_amount } = categoryData;
+  const { name, organization_id, base_amount } = categoryData;
 
-  if (!category_name || !organization_id || base_amount === undefined) {
+  if (!name || !organization_id || base_amount === undefined) {
     throw new Error('Category name, organization ID, and base amount are required');
   }
 
@@ -17,7 +16,7 @@ export async function createCategory(categoryData) {
 
     // Create new category
     const newCategory = new Category({
-      category_name,
+      name,
       organization_id,
       base_amount,
     });

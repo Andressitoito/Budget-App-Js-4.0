@@ -28,7 +28,7 @@ export default function TransactionList({ transactions, categoryId, refetchTrans
           next={() => setPage(prev => prev + 1)}
           hasMore={hasMoreTransactions}
           loader={<h4 className="text-center text-gray-500">Loading...</h4>}
-          endMessage={<p className="text-center text-gray-500">No more transactions</p>}
+          endMessage={<p className="text-center text-gray-500">" "</p>}
         >
           <ul className="space-y-4">
             {paginatedTransactions.map((transaction) => (
