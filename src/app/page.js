@@ -10,11 +10,12 @@ export default function LandingPage() {
   const [joinOrg, setJoinOrg] = useState(false);
   const [orgId, setOrgId] = useState('');
   const [orgName, setOrgName] = useState('');
+  const [username, setUsername] = useState('');
   const [verifyToken, setVerifyToken] = useState('');
   const router = useRouter();
 
   const login = useGoogleLogin({
-    flow: 'implicit', // Avoids popup COOP issues
+    flow: 'implicit',
     redirect_uri: 'http://localhost:3000/auth/callback',
     onSuccess: async (tokenResponse) => {
       try {
@@ -24,7 +25,10 @@ export default function LandingPage() {
         const userData = await res.json();
 
         const payload = {
-          ...userData,
+          username,
+          given_name: userData.given_name,
+          family_name: userData.family_name,
+          picture: userData.picture,
           organizationId: joinOrg ? orgId : null,
           organizationName: joinOrg ? null : orgName,
           token: verifyToken,
@@ -56,6 +60,13 @@ export default function LandingPage() {
       </p>
       <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
         <div className="mb-4">
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Username"
+            className="w-full p-2 border rounded-md mb-4"
+          />
           <label className="flex items-center space-x-2">
             <input
               type="checkbox"

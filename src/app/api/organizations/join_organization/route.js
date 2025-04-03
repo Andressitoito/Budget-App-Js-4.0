@@ -1,11 +1,11 @@
 // src/app/api/organizations/join_organization/route.js
 import dbConnect from '../../../../lib/db';
-import { User, Organization } from '../../../../lib/models';
+import  { User, Organization } from '../../../../lib/models';
 import { createToken } from '../../../../lib/auth';
 
 export async function POST(req) {
   try {
-    const { name, email, given_name, family_name, picture, organizationId, token } = await req.json();
+    const { username, given_name, family_name, picture, organizationId, token } = await req.json();
 
     if (token !== process.env.AUTH_TOKEN) {
       return new Response(JSON.stringify({ error: 'Invalid verification token' }), { status: 403 });
@@ -13,7 +13,7 @@ export async function POST(req) {
 
     await dbConnect();
 
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ username });
     if (user) {
       const alreadyInOrg = user.organizations.some(org => org.organization.toString() === organizationId);
       if (alreadyInOrg) {
@@ -24,7 +24,7 @@ export async function POST(req) {
         });
       }
     } else {
-      user = new User({ name, email, given_name, family_name, picture });
+      user = new User({ username, given_name, family_name, picture });
     }
 
     const org = await Organization.findById(organizationId);
@@ -34,7 +34,8 @@ export async function POST(req) {
 
     user.organizations.push({ organization: org._id, role: 'member' });
     if (!user.defaultOrgId) user.defaultOrgId = org._id;
-    await user.save();
+    org.members.push(user._id);
+    await Promise.all([user.save(), org.save()]);
 
     const jwtToken = createToken(user);
     return new Response(JSON.stringify({ message: 'Joined organization', userId: user._id, orgId: org._id }), {

@@ -13,6 +13,12 @@ const organizationSchema = new mongoose.Schema({
     ref: 'User',
     required: [true, 'An organization must have an owner'],
   },
+  members: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+  ],
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

@@ -1,7 +1,7 @@
 // src/app/layout.js
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AiOutlineHome, AiOutlineBarChart, AiOutlineLogout } from 'react-icons/ai';
@@ -12,6 +12,14 @@ import './globals.css';
 export default function RootLayout({ children }) {
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (window.location.pathname === '/auth/callback') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const orgId = urlParams.get('orgId');
+      if (orgId) router.push(`/dashboard?orgId=${orgId}`);
+    }
+  }, [router]);
 
   const handleLogout = () => {
     document.cookie = 'token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict';

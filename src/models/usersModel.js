@@ -3,9 +3,10 @@ import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema(
   {
-    name: {
+    username: {
       type: String,
-      required: [true, 'A user must have a name'],
+      required: [true, 'A user must have a username'],
+      unique: true,
       trim: true,
     },
     given_name: {
@@ -17,16 +18,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'A user must have a last name'],
       trim: true,
-    },
-    email: {
-      type: String,
-      required: [true, 'A user must have an email'],
-      unique: true,
-      lowercase: true,
-      validate: {
-        validator: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
-        message: 'Please enter a valid email address',
-      },
     },
     picture: {
       type: String,
@@ -42,19 +33,19 @@ const userSchema = new mongoose.Schema(
           ref: 'Organization',
           required: true,
         },
-        role: { type: String, enum: ['owner', 'member'], required: true }, // Simplified roles
+        role: { type: String, enum: ['owner', 'member'], required: true },
         joinedAt: { type: Date, default: Date.now },
       },
     ],
     defaultOrgId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',
-      default: null, // For auto-login
+      default: null,
     },
     categoryOrder: [
       {
         organizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization' },
-        order: [String], // Array of category _ids
+        order: [String],
       },
     ],
     lastLogin: { type: Date, default: Date.now },

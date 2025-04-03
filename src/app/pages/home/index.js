@@ -12,10 +12,9 @@ import { AiOutlinePlus, AiOutlineEdit, AiOutlineDelete } from 'react-icons/ai';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 
-// Dynamic import for Modal, SSR disabled
 const Modal = dynamic(() => import('../../../components/modals/Modal'), { ssr: false });
 
-export default function Home({ initialOrgs, initialCategories = [], initialTransactions = [], selectedOrgId: initialOrgId }) {
+export default function Home({ initialOrgs = [], initialCategories = [], initialTransactions = [], selectedOrgId: initialOrgId }) {
   const { 
     categories: storeCategories, 
     transactions: storeTransactions, 
@@ -27,10 +26,18 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
   const [selectedOrgId, setLocalOrgId] = useState(initialOrgId);
+  const [orgs, setOrgs] = useState(initialOrgs);
   const isInitialMount = useRef(true);
   const router = useRouter();
 
   useEffect(() => {
+    const fetchOrgs = async () => {
+      const res = await fetch('/api/users/orgs', { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) setOrgs(data.orgs);
+    };
+    fetchOrgs();
+
     if (isInitialMount.current) {
       setSelectedOrgId(selectedOrgId);
       setCategories(initialCategories);
@@ -51,31 +58,25 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
       socket.emit('joinOrganization', selectedOrgId);
     });
     socket.on('newTransaction', (transaction) => {
-      console.log('New transaction received:', transaction);
       addTransaction(transaction);
       setTransactions([...storeTransactions.filter(t => t._id !== transaction._id), transaction]);
     });
     socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
-      console.log(`Transactions deleted for category ${category_id}, count: ${deletedCount}`);
       removeTransactions(category_id);
       setTransactions([...storeTransactions.filter(t => t.category_id !== category_id)]);
     });
     socket.on('newCategory', (category) => {
-      console.log('New category received:', category);
       addCategory(category);
       setCategories([...storeCategories.filter(c => c._id !== category._id), category]);
     });
     socket.on('categoryDeleted', ({ category_id }) => {
-      console.log(`Category deleted: ${category_id}`);
       removeCategory(category_id);
       removeTransactions(category_id);
       const newCategories = storeCategories.filter(c => c._id !== category_id);
       setCategories(newCategories);
-      console.log('Categories after deletion:', newCategories);
       setSelectedCategory(newCategories[0] || null);
     });
     socket.on('categoryUpdated', (updatedCategory) => {
-      console.log('Category updated:', updatedCategory);
       updateCategory(updatedCategory);
       if (selectedCategory?._id === updatedCategory._id) {
         setSelectedCategory(updatedCategory);
@@ -83,13 +84,11 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
       setCategories([...storeCategories]);
     });
     socket.on('transactionUpdated', (transaction) => {
-      console.log('Transaction updated:', transaction);
       updateTransaction(transaction);
       const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
       setTransactions(updatedTransactions);
     });
     socket.on('transactionDeleted', ({ transaction_id }) => {
-      console.log('Transaction deleted:', transaction_id);
       removeTransaction(transaction_id);
       setTransactions([...storeTransactions.filter(t => t._id !== transaction_id)]);
     });
@@ -99,8 +98,7 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
 
     return () => socket.disconnect();
   }, [
-    selectedOrgId, 
-    setSelectedOrgId, setCategories, setTransactions, 
+    selectedOrgId, setSelectedOrgId, setCategories, setTransactions, 
     addTransaction, removeTransactions, removeTransaction, 
     addCategory, removeCategory, updateCategory, updateTransaction,
     storeCategories, storeTransactions
@@ -114,7 +112,6 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
     const [movedCategory] = reorderedCategories.splice(source.index, 1);
     reorderedCategories.splice(destination.index, 0, movedCategory);
     setCategories(reorderedCategories);
-    // Update categoryOrder in DB (future step)
   };
 
   const openCreateModal = () => {
@@ -155,9 +152,13 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
       <div className="w-full max-w-4xl p-6">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Organizations</h2>
         <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-          {initialOrgs.map(org => (
+          {orgs.map(org => (
             <div key={org._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
-              <span className="text-gray-700">{org.name} ({org.owner.toString() === userId ? 'Owner' : 'Member'})</span>
+              <div>
+                <span className="text-gray-700">{org.name} ({org.owner === userId ? 'Owner' : 'Member'})</span>
+                <p className="text-sm text-gray-500">Owner: {org.ownerUsername}</p>
+                <p className="text-sm text-gray-500">Members: {org.members.map(m => m.username).join(', ')}</p>
+              </div>
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -187,7 +188,7 @@ export default function Home({ initialOrgs, initialCategories = [], initialTrans
               </p>
               <button
                 className="mt-4 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
-                onClick={() => { setModalConfig(createTransactionConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
+                onClick={openCreateModal}
               >
                 <AiOutlinePlus size={20} />
               </button>
