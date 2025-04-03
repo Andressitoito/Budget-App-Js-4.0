@@ -1,111 +1,51 @@
-import dbConnect from '../../../lib/db';
-import Organization from '../../../models/organizationModel';
-import User from '../../../models/usersModel';
+// src/app/api/organizations/create_new_organization/route.js
+import dbConnect from '../../../../lib/db';
+import User from '../../../../lib/models/usersModel';
+import Organization from '../../../../lib/models/organizationModel';
+import { createToken } from '../../../../lib/auth';
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
+export async function POST(req) {
   try {
-    const { organization: orgName, user: userInfo } = req.body;
+    const { name, email, given_name, family_name, picture, token } = await req.json();
 
-    if (!orgName || !userInfo) {
-      return res.status(400).json({
-        status: 400,
-        message: 'Organization name and user information are required'
-      });
+    if (token !== process.env.AUTH_TOKEN) {
+      return new Response(JSON.stringify({ error: 'Invalid verification token' }), { status: 403 });
     }
 
-    // Connect to the database
     await dbConnect();
 
-    // Check if organization name already exists
-    const existingOrg = await Organization.findOne({ organization: orgName.trim() });
-    if (existingOrg) {
-      return res.status(409).json({
-        status: 409,
-        message: 'An organization with this name already exists'
-      });
-    }
-
-    // Find or create user
-    let user = await User.findOne({ email: userInfo.email });
-    
+    let user = await User.findOne({ email });
     if (user) {
-      // Check if user already owns an organization
-      const userOrgs = await Organization.find({
-        'users': {
-          $elemMatch: {
-            user: user._id,
-            role: 'owner'
-          }
-        }
-      });
-
-      if (userOrgs.length > 0) {
-        return res.status(403).json({
-          status: 403,
-          message: `Sorry ${user.name}, but you already own an organization. Please join an existing organization instead.`,
+      const ownsOrg = user.organizations.some(org => org.role === 'owner');
+      if (ownsOrg) {
+        return new Response(JSON.stringify({
+          error: `Sorry ${user.name}, you already own an organization. Join an existing one instead.`,
           redirect_join_organization: true
-        });
+        }), { status: 403 });
       }
     } else {
-      // Create new user
-      user = new User({
-        name: userInfo.name,
-        given_name: userInfo.given_name,
-        family_name: userInfo.family_name,
-        email: userInfo.email,
-        picture: userInfo.picture
-      });
-      await user.save();
+      user = new User({ name, email, given_name, family_name, picture });
     }
 
-    // Create new organization
-    const newOrg = new Organization({
-      organization: orgName.trim(),
-      main_budget: 0, // Default budget, can be updated later
-      organization_owner: user._id,
-      users: [{
-        user: user._id,
-        role: 'owner'
-      }]
-    });
-
-    const savedOrg = await newOrg.save();
-
-    // Update user's primary organization
-    user.primary_organization = {
-      organization: savedOrg._id,
-      role: 'owner'
-    };
-    
-    if (!user.organizations) {
-      user.organizations = [];
+    const existingOrg = await Organization.findOne({ name });
+    if (existingOrg) {
+      return new Response(JSON.stringify({ error: 'Organization name already exists' }), { status: 409 });
     }
-    user.organizations.push({
-      organization: savedOrg._id,
-      role: 'owner'
-    });
 
+    const org = new Organization({ name, owner: user._id });
+    await org.save();
+
+    user.organizations.push({ organization: org._id, role: 'owner' });
+    user.defaultOrgId = org._id;
     await user.save();
 
-    return res.status(201).json({
+    const jwtToken = createToken(user);
+    return new Response(JSON.stringify({ message: 'Organization created', userId: user._id, orgId: org._id }), {
       status: 201,
-      message: `Organization ${orgName} has been successfully created with ${user.name} as owner`,
-      data: {
-        organization: savedOrg,
-        user: user
-      }
+      headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Strict` },
     });
-
   } catch (error) {
     console.error('Error creating organization:', error);
-    return res.status(500).json({
-      status: 500,
-      message: 'Error creating organization',
-      error: error.message
-    });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

@@ -14,6 +14,8 @@ export default function LandingPage() {
   const router = useRouter();
 
   const login = useGoogleLogin({
+    flow: 'implicit', // Avoids popup COOP issues
+    redirect_uri: 'http://localhost:3000/auth/callback',
     onSuccess: async (tokenResponse) => {
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -26,17 +28,17 @@ export default function LandingPage() {
           organizationId: joinOrg ? orgId : null,
           organizationName: joinOrg ? null : orgName,
           token: verifyToken,
-          joinOrg,
         };
 
-        const createRes = await fetch('/api/users/create_new_user', {
+        const endpoint = joinOrg ? '/api/organizations/join_organization' : '/api/organizations/create_new_organization';
+        const createRes = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
 
         const result = await createRes.json();
-        if (!createRes.ok) throw new Error(result.error || 'Failed to create user');
+        if (!createRes.ok) throw new Error(result.error || `Failed to ${joinOrg ? 'join' : 'create'} organization`);
 
         router.push(`/dashboard?orgId=${result.orgId}`);
       } catch (error) {

@@ -1,132 +1,48 @@
-import dbConnect from '../../../lib/db';
-import { find_organization_by_id } from "../../../lib/api/organizations/find_organization_by_id";
-import { update_organization_member } from "../../../lib/api/organizations/update_organization_member";
-import { update_user_guest_organization } from "../../../lib/api/users/update_user_guest_organizations";
-import { create_new_user } from "../../../lib/api/users/create_new_user";
-import User from '../../../models/usersModel';
+// src/app/api/organizations/join_organization/route.js
+import dbConnect from '../../../../lib/db';
+import { User, Organization } from '../../../../lib/models';
+import { createToken } from '../../../../lib/auth';
 
-async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ status: 405, message: "Method not allowed" });
-  }
-
-  const { user: user_info, organization_id } = req.body;
-  console.log("Request body:", req.body);
-
+export async function POST(req) {
   try {
+    const { name, email, given_name, family_name, picture, organizationId, token } = await req.json();
+
+    if (token !== process.env.AUTH_TOKEN) {
+      return new Response(JSON.stringify({ error: 'Invalid verification token' }), { status: 403 });
+    }
+
     await dbConnect();
 
-    const existingUser = await User.findOne({ email: user_info.email });
-    console.log("Existing user:", existingUser);
-
-    let user = { ...user_info };
-
-    let organization;
-    try {
-      organization = await find_organization_by_id(organization_id);
-    } catch (error) {
-      return res.status(422).json({
-        status: 422,
-        message: "Invalid organization ID",
-        error: error.toString(),
-      });
-    }
-
-    const orgName = organization.organization; // Store the name explicitly
-
-    if (existingUser) {
-      if (existingUser.isMemberOf(organization_id)) {
-        return res.status(422).json({
-          status: 422,
-          message: "User is already a member of this organization",
-          user: existingUser,
-          organization,
+    let user = await User.findOne({ email });
+    if (user) {
+      const alreadyInOrg = user.organizations.some(org => org.organization.toString() === organizationId);
+      if (alreadyInOrg) {
+        const jwtToken = createToken(user);
+        return new Response(JSON.stringify({ message: 'User already in organization', userId: user._id, orgId: organizationId }), {
+          status: 200,
+          headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Strict` },
         });
       }
-
-      let saved_user, saved_organization;
-      try {
-        const updated = await update_user_guest_organization(existingUser._id, organization_id);
-        saved_user = updated.saved_user;
-        organization = updated.organization;
-      } catch (error) {
-        return res.status(422).json({
-          status: 422,
-          message: "Something went wrong updating user",
-          error: error.toString(),
-        });
-      }
-
-      try {
-        saved_organization = await update_organization_member(existingUser._id, organization_id);
-        console.log("Updated organization:", saved_organization);
-      } catch (error) {
-        return res.status(422).json({
-          status: 422,
-          message: "Error updating organization member",
-          error: error.toString(),
-        });
-      }
-
-      res.status(201).json({
-        status: 201,
-        message: `The user ${user.name} has successfully joined the ${orgName} organization`,
-        user: saved_user,
-        organization: saved_organization,
-      });
     } else {
-      let saved_user, saved_organization;
-
-      try {
-        saved_user = await create_new_user(user);
-      } catch (error) {
-        return res.status(501).json({
-          status: 501,
-          message: "Something went wrong creating user",
-          error: error.toString(),
-        });
-      }
-
-      try {
-        const updated = await update_user_guest_organization(saved_user._id, organization_id);
-        saved_user = updated.saved_user;
-        organization = updated.organization;
-      } catch (error) {
-        return res.status(422).json({
-          status: 422,
-          message: "Something went wrong updating user",
-          error: error.toString(),
-        });
-      }
-
-      try {
-        console.log('Calling update_organization_member with:', {
-          user_id: saved_user._id,
-          organization_id: organization_id,
-        });
-        saved_organization = await update_organization_member(saved_user._id, organization_id);
-      } catch (error) {
-        return res.status(422).json({
-          status: 422,
-          message: "Error updating organization member",
-          error: error.toString(),
-        });
-      }
-
-      res.status(201).json({
-        status: 201,
-        message: `The user ${user.name} has successfully joined the ${orgName} organization`,
-        user: saved_user,
-        organization: saved_organization,
-      });
+      user = new User({ name, email, given_name, family_name, picture });
     }
-  } catch (error) {
-    return res.status(500).json({
-      status: 500,
-      message: "Internal server error",
-      error: error.toString(),
+
+    const org = await Organization.findById(organizationId);
+    if (!org) {
+      return new Response(JSON.stringify({ error: 'Organization not found' }), { status: 404 });
+    }
+
+    user.organizations.push({ organization: org._id, role: 'member' });
+    if (!user.defaultOrgId) user.defaultOrgId = org._id;
+    await user.save();
+
+    const jwtToken = createToken(user);
+    return new Response(JSON.stringify({ message: 'Joined organization', userId: user._id, orgId: org._id }), {
+      status: 201,
+      headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Strict` },
     });
+  } catch (error) {
+    console.error('Error joining organization:', error);
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }
-
-export default handler;

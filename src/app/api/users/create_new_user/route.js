@@ -1,6 +1,6 @@
 // src/app/api/users/create_new_user/route.js
 import dbConnect from '../../../../lib/db';
-import { User, Organization } from '../../../../lib/models';
+import {User, Organization} from '../../../../lib/models';
 import { createToken } from '../../../../lib/auth';
 
 export async function POST(req) {
@@ -15,7 +15,12 @@ export async function POST(req) {
 
     let user = await User.findOne({ email });
     if (user) {
-      return new Response(JSON.stringify({ error: 'User already exists' }), { status: 400 });
+      const jwtToken = createToken(user);
+      const orgId = user.organizations[0]?.organization || organizationId;
+      return new Response(JSON.stringify({ message: 'User exists', userId: user._id, orgId }), {
+        status: 200,
+        headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Strict` },
+      });
     }
 
     user = new User({ name, email, given_name, family_name, picture });
@@ -31,7 +36,7 @@ export async function POST(req) {
       org = new Organization({ name: organizationName, owner: user._id });
       await org.save();
       user.organizations.push({ organization: org._id, role: 'owner' });
-      user.defaultOrgId = org._id; // Auto-set default for creator
+      user.defaultOrgId = org._id;
     }
 
     await user.save();
