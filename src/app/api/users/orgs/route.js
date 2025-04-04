@@ -1,7 +1,6 @@
 // src/app/api/users/orgs/route.js
 import dbConnect from '../../../../lib/db';
-import User from '../../../../lib/models/usersModel';
-import Organization from '../../../../lib/models/organizationModel';
+import { User, Organization } from '../../../../lib/models';
 import { authMiddleware } from '../../../../lib/auth';
 
 export async function GET(req) {

@@ -1,4 +1,3 @@
-// src/models/usersModel.js
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema(
@@ -21,10 +20,7 @@ const userSchema = new mongoose.Schema(
     },
     picture: {
       type: String,
-      validate: {
-        validator: (value) => /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(value),
-        message: 'Please enter a valid URL',
-      },
+      message: 'Please enter a valid URL',
     },
     organizations: [
       {

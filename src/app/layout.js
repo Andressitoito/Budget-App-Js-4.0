@@ -38,7 +38,7 @@ export default function RootLayout({ children }) {
                   className="flex items-center bg-blue-700 px-3 py-1 rounded-md"
                   onClick={() => router.push('/dashboard')}
                 >
-                  <AiOutlineHome size={16} className="mr-2" /> Home
+                  <AiOutlineHome size={16} className="mr-2" /> Dashboard
                 </button>
                 <button className="flex items-center px-3 py-1 rounded-md opacity-50">
                   <AiOutlineBarChart size={16} className="mr-2" /> Charts

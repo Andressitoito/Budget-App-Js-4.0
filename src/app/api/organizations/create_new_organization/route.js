@@ -11,8 +11,11 @@ export async function POST(req) {
       return new Response(JSON.stringify({ error: 'Invalid verification token' }), { status: 403 });
     }
 
-    console.log('Creating new organization...');
-    console.log('Request data:', { username, given_name, family_name, picture, organizationName });
+    if (!organizationName || typeof organizationName !== 'string' || organizationName.trim() === '') {
+      return new Response(JSON.stringify({ error: 'Organization name is required and must be a non-empty string' }), { status: 400 });
+    }
+
+    console.log('Creating organization:', { username, organizationName });
 
     await dbConnect();
 
@@ -27,6 +30,8 @@ export async function POST(req) {
       }
     } else {
       user = new User({ username, given_name, family_name, picture });
+      await user.save();
+      console.log('New user created:', user._id);
     }
 
     const existingOrg = await Organization.findOne({ name: organizationName });

@@ -1,20 +1,20 @@
-// src/app/pages/home/index.js
-"use client";
+// src/app/dashboard/page.js
+'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import io from 'socket.io-client';
-import useAppStore from '../../../stores/appStore';
+import useAppStore from '../../stores/appStore';
 import dynamic from 'next/dynamic';
-import CategoryList from '../../../components/category/CategoryList';
-import TransactionList from '../../../components/transactions/TransactionList';
-import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig } from './configs';
+import CategoryList from '../../components/category/CategoryList';
+import TransactionList from '../../components/transactions/TransactionList';
+import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig } from './configs'; // Fixed path
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineDelete } from 'react-icons/ai';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-toastify';
 
-const Modal = dynamic(() => import('../../../components/modals/Modal'), { ssr: false });
+const Modal = dynamic(() => import('../../components/modals/Modal'), { ssr: false });
 
-export default function Home({ initialOrgs = [], initialCategories = [], initialTransactions = [], selectedOrgId: initialOrgId }) {
+export default function Dashboard() {
   const { 
     categories: storeCategories, 
     transactions: storeTransactions, 
@@ -22,86 +22,98 @@ export default function Home({ initialOrgs = [], initialCategories = [], initial
     addTransaction, removeTransactions, removeTransaction, 
     addCategory, removeCategory, updateCategory, updateTransaction 
   } = useAppStore();
-  const [selectedCategory, setSelectedCategory] = useState(initialCategories[0] || null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
-  const [selectedOrgId, setLocalOrgId] = useState(initialOrgId);
-  const [orgs, setOrgs] = useState(initialOrgs);
+  const [selectedOrgId, setLocalOrgId] = useState(null);
+  const [orgs, setOrgs] = useState([]);
   const isInitialMount = useRef(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialOrgId = searchParams.get('orgId');
 
   useEffect(() => {
     const fetchOrgs = async () => {
-      const res = await fetch('/api/users/orgs', { credentials: 'include' });
-      const data = await res.json();
-      if (res.ok) setOrgs(data.orgs);
+      try {
+        const res = await fetch('/api/users/orgs', { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok) {
+          setOrgs(data.orgs);
+          const orgId = initialOrgId || data.orgs.find(o => o._id === data.defaultOrgId)?._id || data.orgs[0]?._id;
+          if (orgId) {
+            setLocalOrgId(orgId);
+            setSelectedOrgId(orgId);
+          } else {
+            router.push('/');
+          }
+        } else {
+          throw new Error(data.error || 'Unauthorized');
+        }
+      } catch (error) {
+        console.error('Fetch orgs error:', error);
+        toast.error('Please log in again');
+        router.push('/');
+      }
     };
     fetchOrgs();
 
-    if (isInitialMount.current) {
-      setSelectedOrgId(selectedOrgId);
-      setCategories(initialCategories);
-      setTransactions(initialTransactions);
-      if (!selectedCategory && initialCategories.length > 0) {
-        setSelectedCategory(initialCategories[0]);
-      }
+    if (isInitialMount.current && selectedOrgId) {
+      const socket = io('http://localhost:3000', {
+        path: '/socket.io',
+        transports: ['websocket', 'polling'],
+      });
+
+      socket.on('connect', () => {
+        console.log('Connected to Socket.io');
+        socket.emit('joinOrganization', selectedOrgId);
+      });
+      socket.on('newTransaction', (transaction) => {
+        addTransaction(transaction);
+        setTransactions([...storeTransactions.filter(t => t._id !== transaction._id), transaction]);
+      });
+      socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
+        removeTransactions(category_id);
+        setTransactions([...storeTransactions.filter(t => t.category_id !== category_id)]);
+      });
+      socket.on('newCategory', (category) => {
+        addCategory(category);
+        setCategories([...storeCategories.filter(c => c._id !== category._id), category]);
+      });
+      socket.on('categoryDeleted', ({ category_id }) => {
+        removeCategory(category_id);
+        removeTransactions(category_id);
+        const newCategories = storeCategories.filter(c => c._id !== category_id);
+        setCategories(newCategories);
+        setSelectedCategory(newCategories[0] || null);
+      });
+      socket.on('categoryUpdated', (updatedCategory) => {
+        updateCategory(updatedCategory);
+        if (selectedCategory?._id === updatedCategory._id) {
+          setSelectedCategory(updatedCategory);
+        }
+        setCategories([...storeCategories]);
+      });
+      socket.on('transactionUpdated', (transaction) => {
+        updateTransaction(transaction);
+        const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
+        setTransactions(updatedTransactions);
+      });
+      socket.on('transactionDeleted', ({ transaction_id }) => {
+        removeTransaction(transaction_id);
+        setTransactions([...storeTransactions.filter(t => t._id !== transaction_id)]);
+      });
+      socket.on('connect_error', (err) => {
+        console.error('Socket connection error:', err);
+      });
+
       isInitialMount.current = false;
+      return () => socket.disconnect();
     }
-
-    const socket = io('http://localhost:3000', {
-      path: '/socket.io',
-      transports: ['websocket', 'polling'],
-    });
-
-    socket.on('connect', () => {
-      console.log('Connected to Socket.io');
-      socket.emit('joinOrganization', selectedOrgId);
-    });
-    socket.on('newTransaction', (transaction) => {
-      addTransaction(transaction);
-      setTransactions([...storeTransactions.filter(t => t._id !== transaction._id), transaction]);
-    });
-    socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
-      removeTransactions(category_id);
-      setTransactions([...storeTransactions.filter(t => t.category_id !== category_id)]);
-    });
-    socket.on('newCategory', (category) => {
-      addCategory(category);
-      setCategories([...storeCategories.filter(c => c._id !== category._id), category]);
-    });
-    socket.on('categoryDeleted', ({ category_id }) => {
-      removeCategory(category_id);
-      removeTransactions(category_id);
-      const newCategories = storeCategories.filter(c => c._id !== category_id);
-      setCategories(newCategories);
-      setSelectedCategory(newCategories[0] || null);
-    });
-    socket.on('categoryUpdated', (updatedCategory) => {
-      updateCategory(updatedCategory);
-      if (selectedCategory?._id === updatedCategory._id) {
-        setSelectedCategory(updatedCategory);
-      }
-      setCategories([...storeCategories]);
-    });
-    socket.on('transactionUpdated', (transaction) => {
-      updateTransaction(transaction);
-      const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
-      setTransactions(updatedTransactions);
-    });
-    socket.on('transactionDeleted', ({ transaction_id }) => {
-      removeTransaction(transaction_id);
-      setTransactions([...storeTransactions.filter(t => t._id !== transaction_id)]);
-    });
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err);
-    });
-
-    return () => socket.disconnect();
   }, [
     selectedOrgId, setSelectedOrgId, setCategories, setTransactions, 
     addTransaction, removeTransactions, removeTransaction, 
     addCategory, removeCategory, updateCategory, updateTransaction,
-    storeCategories, storeTransactions
+    storeCategories, storeTransactions, router, initialOrgId
   ]);
 
   const handleDragEnd = (result) => {
@@ -141,6 +153,7 @@ export default function Home({ initialOrgs = [], initialCategories = [], initial
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orgId }),
+        credentials: 'include',
       });
       toast.success('Default organization updated');
     }
@@ -155,7 +168,7 @@ export default function Home({ initialOrgs = [], initialCategories = [], initial
           {orgs.map(org => (
             <div key={org._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
               <div>
-                <span className="text-gray-700">{org.name} ({org.owner === userId ? 'Owner' : 'Member'})</span>
+                <span className="text-gray-700">{org.name} ({org.role})</span>
                 <p className="text-sm text-gray-500">Owner: {org.ownerUsername}</p>
                 <p className="text-sm text-gray-500">Members: {org.members.map(m => m.username).join(', ')}</p>
               </div>

@@ -1,6 +1,6 @@
 // src/app/api/organizations/join_organization/route.js
 import dbConnect from '../../../../lib/db';
-import  { User, Organization } from '../../../../lib/models';
+import { User, Organization } from '../../../../lib/models';
 import { createToken } from '../../../../lib/auth';
 
 export async function POST(req) {
@@ -10,6 +10,8 @@ export async function POST(req) {
     if (token !== process.env.AUTH_TOKEN) {
       return new Response(JSON.stringify({ error: 'Invalid verification token' }), { status: 403 });
     }
+
+    console.log('Joining organization:', { username, organizationId });
 
     await dbConnect();
 
@@ -25,6 +27,8 @@ export async function POST(req) {
       }
     } else {
       user = new User({ username, given_name, family_name, picture });
+      await user.save();
+      console.log('New user created:', user._id);
     }
 
     const org = await Organization.findById(organizationId);

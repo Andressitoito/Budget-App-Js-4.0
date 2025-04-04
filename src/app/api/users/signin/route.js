@@ -1,25 +1,28 @@
 // src/app/api/users/signin/route.js
-import { google } from 'googleapis';
+import dbConnect from '../../../../lib/db';
+import { User } from '../../../../lib/models';
 import { createToken } from '../../../../lib/auth';
 
 export async function POST(req) {
   try {
-    const { code } = await req.json();
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      'http://localhost:3000/auth/callback'
-    );
+    const { username, given_name, family_name, picture } = await req.json();
 
-    const { tokens } = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(tokens);
+    await dbConnect();
 
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const { data } = await oauth2.userinfo.get();
+    let user = await User.findOne({ username });
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'User not found, please register' }), { status: 404 });
+    }
 
-    const { name, email, given_name, family_name, picture } = data;
-    const jwtToken = createToken({ email, name, given_name, family_name, picture });
-    return new Response(JSON.stringify({ message: 'Signed in', user: data }), {
+    // Update user details if changed
+    user.given_name = given_name;
+    user.family_name = family_name;
+    user.picture = picture;
+    user.lastLogin = Date.now();
+    await user.save();
+
+    const jwtToken = createToken(user);
+    return new Response(JSON.stringify({ message: 'Signed in', userId: user._id, defaultOrgId: user.defaultOrgId }), {
       status: 200,
       headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Strict` },
     });
