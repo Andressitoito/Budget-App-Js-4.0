@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 
 export default function LandingPage() {
-  const [isSignIn, setIsSignIn] = useState(true); // Toggle Sign In vs Register
+  const [isSignIn, setIsSignIn] = useState(true);
   const [joinOrg, setJoinOrg] = useState(false);
   const [orgId, setOrgId] = useState('');
   const [orgName, setOrgName] = useState('');
@@ -22,19 +22,20 @@ export default function LandingPage() {
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+          credentials: 'include',
         });
         const userData = await res.json();
+        console.log('Google user data:', userData);
 
         const payload = {
-          username,
+          email: userData.email,
           given_name: userData.given_name,
           family_name: userData.family_name,
           picture: userData.picture,
-          organizationId: joinOrg && !isSignIn ? orgId : null,
-          organizationName: !joinOrg && !isSignIn ? orgName : null,
-          token: !isSignIn ? verifyToken : null, // Only needed for register
+          ...(isSignIn ? {} : { username, organizationId: joinOrg ? orgId : null, organizationName: joinOrg ? null : orgName, token: verifyToken }),
         };
 
+        console.log('Sending auth request with payload:', payload);
         const endpoint = isSignIn ? '/api/users/signin' : (joinOrg ? '/api/organizations/join_organization' : '/api/organizations/create_new_organization');
         const authRes = await fetch(endpoint, {
           method: 'POST',
@@ -44,14 +45,20 @@ export default function LandingPage() {
         });
 
         const result = await authRes.json();
-        if (!authRes.ok) throw new Error(result.error || `Failed to ${isSignIn ? 'sign in' : (joinOrg ? 'join' : 'create')} organization`);
+        const cookieHeader = authRes.headers.get('Set-Cookie');
+        console.log('Auth response:', { status: authRes.status, result, cookie: cookieHeader });
+        if (!authRes.ok) throw new Error(result.error || `Failed to ${isSignIn ? 'sign in' : (joinOrg ? 'join' : 'create')} - Status: ${authRes.status}`);
 
         router.push(`/dashboard?orgId=${result.orgId || result.defaultOrgId}`);
       } catch (error) {
-        toast.error(error.message);
+        console.error('Login error:', error);
+        toast.error(`Login failed: ${error.message}`);
       }
     },
-    onError: () => toast.error('Google login failed'),
+    onError: () => {
+      console.error('Google login failed');
+      toast.error('Google login failed');
+    },
   });
 
   return (
@@ -95,7 +102,7 @@ export default function LandingPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
+                placeholder="Username (optional)"
                 className="w-full p-2 border rounded-md mb-4"
               />
               <label className="flex items-center space-x-2">

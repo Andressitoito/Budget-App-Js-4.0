@@ -7,7 +7,7 @@ import useAppStore from '../../stores/appStore';
 import dynamic from 'next/dynamic';
 import CategoryList from '../../components/category/CategoryList';
 import TransactionList from '../../components/transactions/TransactionList';
-import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig } from './configs'; // Fixed path
+import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig } from './configs';
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineDelete } from 'react-icons/ai';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-toastify';
@@ -35,8 +35,14 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchOrgs = async () => {
       try {
-        const res = await fetch('/api/users/orgs', { credentials: 'include' });
+        console.log('Fetching orgs with credentials...');
+        const res = await fetch('/api/users/orgs', { 
+          credentials: 'include',
+          headers: { 'Accept': 'application/json' },
+        });
+        console.log('Fetch response:', { status: res.status, headers: res.headers.get('Set-Cookie') });
         const data = await res.json();
+        console.log('Fetch data:', data);
         if (res.ok) {
           setOrgs(data.orgs);
           const orgId = initialOrgId || data.orgs.find(o => o._id === data.defaultOrgId)?._id || data.orgs[0]?._id;
@@ -44,6 +50,7 @@ export default function Dashboard() {
             setLocalOrgId(orgId);
             setSelectedOrgId(orgId);
           } else {
+            console.log('No orgId found, redirecting to /');
             router.push('/');
           }
         } else {

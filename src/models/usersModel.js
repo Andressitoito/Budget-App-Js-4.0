@@ -1,12 +1,26 @@
+// src/models/usersModel.js
 import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema(
   {
     username: {
       type: String,
-      required: [true, 'A user must have a username'],
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: [true, 'A user must have an email'],
       unique: true,
       trim: true,
+      lowercase: true,
+      validate: {
+        validator: (value) => {
+          const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+          if (!isValid) console.log('Email validation failed:', value);
+          return isValid;
+        },
+        message: 'Please enter a valid email address',
+      },
     },
     given_name: {
       type: String,
@@ -20,7 +34,7 @@ const userSchema = new mongoose.Schema(
     },
     picture: {
       type: String,
-      message: 'Please enter a valid URL',
+      required: [true, 'A user must have a picture'],
     },
     organizations: [
       {
@@ -69,6 +83,11 @@ userSchema.methods.getRoleInOrganization = function (organizationId) {
   );
   return org ? org.role : null;
 };
+
+userSchema.pre('save', function (next) {
+  console.log('Saving user:', this);
+  next();
+});
 
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
