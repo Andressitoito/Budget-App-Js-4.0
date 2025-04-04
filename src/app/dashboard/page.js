@@ -25,46 +25,50 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
-  const [selectedOrgId, setLocalOrgId] = useState(null);
-  const [orgs, setOrgs] = useState([]);
   const isInitialMount = useRef(true);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialOrgId = searchParams.get('orgId');
+  const orgId = searchParams.get('orgId');
+  const token = searchParams.get('token');
+  const userDataParam = searchParams.get('user');
+  const [userData, setUserData] = useState(userDataParam ? JSON.parse(decodeURIComponent(userDataParam)) : null);
 
   useEffect(() => {
-    const fetchOrgs = async () => {
-      try {
-        console.log('Fetching orgs with credentials...');
-        const res = await fetch('/api/users/orgs', { 
-          credentials: 'include',
-          headers: { 'Accept': 'application/json' },
-        });
-        console.log('Fetch response:', { status: res.status, headers: res.headers.get('Set-Cookie') });
-        const data = await res.json();
-        console.log('Fetch data:', data);
-        if (res.ok) {
-          setOrgs(data.orgs);
-          const orgId = initialOrgId || data.orgs.find(o => o._id === data.defaultOrgId)?._id || data.orgs[0]?._id;
-          if (orgId) {
-            setLocalOrgId(orgId);
-            setSelectedOrgId(orgId);
-          } else {
-            console.log('No orgId found, redirecting to /');
-            router.push('/');
-          }
-        } else {
-          throw new Error(data.error || 'Unauthorized');
-        }
-      } catch (error) {
-        console.error('Fetch orgs error:', error);
-        toast.error('Please log in again');
+    const loadInitialData = async () => {
+      if (!token) {
+        console.log('No token, redirecting to /');
+        toast.error('Session invalid, please log in again');
         router.push('/');
+        return;
       }
-    };
-    fetchOrgs();
 
-    if (isInitialMount.current && selectedOrgId) {
+      if (!userData) {
+        // Fetch user data if not in URL (e.g., after refresh)
+        try {
+          const res = await fetch('/api/users/me', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error('Failed to fetch user data');
+          const data = await res.json();
+          setUserData(data.user);
+          router.push(`/dashboard?orgId=${data.user.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
+        } catch (error) {
+          console.error('Fetch user error:', error);
+          toast.error('Please log in again');
+          router.push('/');
+          return;
+        }
+      }
+
+      console.log('Dashboard loaded with:', { userData, orgId });
+
+      if (isInitialMount.current) {
+        setSelectedOrgId(orgId);
+        setCategories([]); // Start empty, socket will populate
+        setTransactions([]);
+        isInitialMount.current = false;
+      }
+
       const socket = io('http://localhost:3000', {
         path: '/socket.io',
         transports: ['websocket', 'polling'],
@@ -72,21 +76,26 @@ export default function Dashboard() {
 
       socket.on('connect', () => {
         console.log('Connected to Socket.io');
-        socket.emit('joinOrganization', selectedOrgId);
+        socket.emit('joinOrganization', orgId);
       });
       socket.on('newTransaction', (transaction) => {
+        console.log('New transaction received:', transaction);
         addTransaction(transaction);
         setTransactions([...storeTransactions.filter(t => t._id !== transaction._id), transaction]);
       });
       socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
+        console.log(`Transactions deleted for category ${category_id}, count: ${deletedCount}`);
         removeTransactions(category_id);
         setTransactions([...storeTransactions.filter(t => t.category_id !== category_id)]);
       });
       socket.on('newCategory', (category) => {
+        console.log('New category received:', category);
         addCategory(category);
         setCategories([...storeCategories.filter(c => c._id !== category._id), category]);
+        if (!selectedCategory) setSelectedCategory(category);
       });
       socket.on('categoryDeleted', ({ category_id }) => {
+        console.log(`Category deleted: ${category_id}`);
         removeCategory(category_id);
         removeTransactions(category_id);
         const newCategories = storeCategories.filter(c => c._id !== category_id);
@@ -94,6 +103,7 @@ export default function Dashboard() {
         setSelectedCategory(newCategories[0] || null);
       });
       socket.on('categoryUpdated', (updatedCategory) => {
+        console.log('Category updated:', updatedCategory);
         updateCategory(updatedCategory);
         if (selectedCategory?._id === updatedCategory._id) {
           setSelectedCategory(updatedCategory);
@@ -101,11 +111,13 @@ export default function Dashboard() {
         setCategories([...storeCategories]);
       });
       socket.on('transactionUpdated', (transaction) => {
+        console.log('Transaction updated:', transaction);
         updateTransaction(transaction);
         const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
         setTransactions(updatedTransactions);
       });
       socket.on('transactionDeleted', ({ transaction_id }) => {
+        console.log('Transaction deleted:', transaction_id);
         removeTransaction(transaction_id);
         setTransactions([...storeTransactions.filter(t => t._id !== transaction_id)]);
       });
@@ -113,14 +125,15 @@ export default function Dashboard() {
         console.error('Socket connection error:', err);
       });
 
-      isInitialMount.current = false;
       return () => socket.disconnect();
-    }
+    };
+
+    loadInitialData();
   }, [
-    selectedOrgId, setSelectedOrgId, setCategories, setTransactions, 
-    addTransaction, removeTransactions, removeTransaction, 
-    addCategory, removeCategory, updateCategory, updateTransaction,
-    storeCategories, storeTransactions, router, initialOrgId
+    orgId, token, userData, userDataParam, router, setSelectedOrgId, setCategories, 
+    setTransactions, addTransaction, removeTransactions, removeTransaction, 
+    addCategory, removeCategory, updateCategory, updateTransaction, 
+    storeCategories, storeTransactions, selectedCategory
   ]);
 
   const handleDragEnd = (result) => {
@@ -134,7 +147,7 @@ export default function Dashboard() {
   };
 
   const openCreateModal = () => {
-    setModalConfig(createCategoryConfig(selectedOrgId));
+    setModalConfig(createCategoryConfig(orgId));
     setIsModalOpen(true);
   };
 
@@ -145,56 +158,28 @@ export default function Dashboard() {
       endpoint: '/api/transactions/delete_all_transactions',
       method: 'DELETE',
       action: 'delete all transactions',
-      initialData: { category_id: selectedCategory?._id, organization_id: selectedOrgId },
-      organization_id: selectedOrgId,
+      initialData: { category_id: selectedCategory?._id, organization_id: orgId },
+      organization_id: orgId,
       submitLabel: 'Delete All',
     });
     setIsModalOpen(true);
   };
 
-  const handleOrgChange = async (orgId, setAsDefault = false) => {
-    setLocalOrgId(orgId);
-    setSelectedOrgId(orgId);
-    if (setAsDefault) {
-      await fetch('/api/users/set_default_org', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgId }),
-        credentials: 'include',
-      });
-      toast.success('Default organization updated');
-    }
-    router.push(`/dashboard?orgId=${orgId}`);
-  };
-
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center">
-      <div className="w-full max-w-4xl p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Organizations</h2>
-        <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-          {orgs.map(org => (
-            <div key={org._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
-              <div>
-                <span className="text-gray-700">{org.name} ({org.role})</span>
-                <p className="text-sm text-gray-500">Owner: {org.ownerUsername}</p>
-                <p className="text-sm text-gray-500">Members: {org.members.map(m => m.username).join(', ')}</p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={org._id === selectedOrgId}
-                  onChange={() => handleOrgChange(org._id, true)}
-                  className="form-checkbox h-5 w-5 text-blue-600"
-                />
-                <button
-                  className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600"
-                  onClick={() => handleOrgChange(org._id)}
-                >
-                  Go
-                </button>
-              </div>
-            </div>
-          ))}
+    <div className="min-h-screen bg-gray-100 flex justify-center">
+      <CategoryList
+        categories={storeCategories}
+        selectedCategory={selectedCategory}
+        onSelect={setSelectedCategory}
+        openCreateModal={openCreateModal}
+        onDragEnd={handleDragEnd}
+      />
+      <div className="w-1/2 p-6 flex flex-col items-center relative mt-16 z-0">
+        <div className="bg-white p-4 rounded-lg shadow-md mb-6 w-full max-w-md">
+          <p className="text-gray-700">Welcome, {userData?.given_name} {userData?.family_name}</p>
+          <p className="text-sm text-gray-500">
+            Organization: {userData?.organizations.find(o => o.organization.toString() === orgId)?.name || 'Loading...'}
+          </p>
         </div>
         {selectedCategory ? (
           <>
@@ -208,20 +193,23 @@ export default function Dashboard() {
               </p>
               <button
                 className="mt-4 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
-                onClick={openCreateModal}
+                onClick={() => { 
+                  setModalConfig(createTransactionConfig(selectedCategory, orgId, userData?.username || userData?.email)); 
+                  setIsModalOpen(true); 
+                }}
               >
                 <AiOutlinePlus size={20} />
               </button>
               <div className="absolute top-4 right-4 flex space-x-2">
                 <button
                   className="bg-yellow-500 text-white p-2 rounded-full hover:bg-yellow-600"
-                  onClick={() => { setModalConfig(editCategoryConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
+                  onClick={() => { setModalConfig(editCategoryConfig(selectedCategory, orgId)); setIsModalOpen(true); }}
                 >
                   <AiOutlineEdit size={20} />
                 </button>
                 <button
                   className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
-                  onClick={() => { setModalConfig(deleteCategoryConfig(selectedCategory, selectedOrgId)); setIsModalOpen(true); }}
+                  onClick={() => { setModalConfig(deleteCategoryConfig(selectedCategory, orgId)); setIsModalOpen(true); }}
                 >
                   <AiOutlineDelete size={20} />
                 </button>

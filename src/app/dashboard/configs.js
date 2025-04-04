@@ -1,5 +1,5 @@
 // src/app/dashboard/configs.js
-export const createTransactionConfig = (category, organizationId) => ({
+export const createTransactionConfig = (category, organizationId, username) => ({
   title: 'Create Transaction',
   fields: [
     { label: 'Item', name: 'item', type: 'text' },
@@ -8,7 +8,7 @@ export const createTransactionConfig = (category, organizationId) => ({
   endpoint: '/api/transactions/create_transaction',
   method: 'POST',
   action: 'create transaction',
-  initialData: { category_id: category._id, organization_id: organizationId },
+  initialData: { category_id: category._id, organization_id: organizationId, username },
   organization_id: organizationId,
   submitLabel: 'Create',
 });

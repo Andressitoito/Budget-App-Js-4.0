@@ -1,12 +1,10 @@
 // src/app/api/organizations/join_organization/route.js
 import dbConnect from '../../../../lib/db';
-import User from '../../../../lib/models/usersModel';
-import Organization from '../../../../lib/models/organizationModel';
-import { createToken } from '../../../../lib/auth';
+import  {User, Organization} from '../../../../lib/models';
 
 export async function POST(req) {
   try {
-    const { username, email, given_name, family_name, picture, organizationId, token } = await req.json();
+    const { username, email, given_name, family_name, picture, organizationId, token, googleToken } = await req.json();
 
     console.log('Join org request:', { email, organizationId });
 
@@ -22,12 +20,22 @@ export async function POST(req) {
     if (user) {
       const alreadyInOrg = user.organizations.some(org => org.organization.toString() === organizationId);
       if (alreadyInOrg) {
-        const jwtToken = createToken(user);
         console.log('User already in org:', user._id);
-        return new Response(JSON.stringify({ message: 'User already in organization', userId: user._id, orgId: organizationId }), {
-          status: 200,
-          headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=3600` },
-        });
+        const org = await Organization.findById(organizationId);
+        return new Response(JSON.stringify({ 
+          message: 'User already in organization', 
+          userId: user._id, 
+          orgId: organizationId, 
+          token: googleToken, 
+          user: { 
+            _id: user._id, 
+            email: user.email, 
+            given_name: user.given_name, 
+            family_name: user.family_name, 
+            organizations: user.organizations.map(o => ({ ...o.toObject(), name: o.organization.toString() === organizationId ? org.name : null })), 
+            defaultOrgId: user.defaultOrgId 
+          } 
+        }), { status: 200 });
       }
     } else {
       user = new User({ username, email, given_name, family_name, picture });
@@ -47,12 +55,20 @@ export async function POST(req) {
     await Promise.all([user.save(), org.save()]);
     console.log('User and org updated:', user._id, org._id);
 
-    const jwtToken = createToken(user);
-    console.log('Setting cookie with token:', jwtToken);
-    return new Response(JSON.stringify({ message: 'Joined organization', userId: user._id, orgId: org._id }), {
-      status: 201,
-      headers: { 'Set-Cookie': `token=${jwtToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=3600` },
-    });
+    return new Response(JSON.stringify({ 
+      message: 'Joined organization', 
+      userId: user._id, 
+      orgId: org._id, 
+      token: googleToken, 
+      user: { 
+        _id: user._id, 
+        email: user.email, 
+        given_name: user.given_name, 
+        family_name: user.family_name, 
+        organizations: user.organizations.map(o => ({ ...o.toObject(), name: o.organization.toString() === organizationId ? org.name : null })), 
+        defaultOrgId: user.defaultOrgId 
+      } 
+    }), { status: 201 });
   } catch (error) {
     console.error('Join org error:', error.stack);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });

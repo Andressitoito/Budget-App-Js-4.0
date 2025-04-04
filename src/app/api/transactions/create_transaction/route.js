@@ -7,6 +7,8 @@ export async function POST(req) {
     await dbConnect();
     const { category_id, organization_id, username, item, price } = await req.json();
 
+    console.log('Creating transaction:', { category_id, organization_id, username, item, price });
+
     if (!category_id || !organization_id || !username || !item || price === undefined) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }

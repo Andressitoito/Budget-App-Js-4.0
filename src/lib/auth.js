@@ -1,22 +1,34 @@
 // src/lib/auth.js
 import jwt from 'jsonwebtoken';
-import { parse } from 'cookie';
 
 export const authMiddleware = async (req) => {
-  const cookies = req.headers.cookie ? parse(req.headers.cookie) : {};
-  const token = cookies.token;
+  const authHeader = req.headers.get('authorization');
+  const googleToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
-  console.log('Auth middleware - Cookies:', cookies);
+  console.log('Auth middleware - Headers:', { authHeader, googleToken });
 
-  if (!token) {
-    console.log('No token found in cookies');
+  if (!googleToken) {
+    console.log('No Google token found in Authorization header');
     return { error: 'Unauthorized', status: 401 };
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Token verified:', decoded);
-    return { user: decoded };
+    const res = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleToken}`);
+    if (!res.ok) throw new Error('Invalid Google token');
+    const tokenData = await res.json();
+    console.log('Google token verified:', tokenData);
+
+    const User = (await import('../models/usersModel.js')).default;
+    const dbConnect = (await import('../lib/db.js')).default;
+    await dbConnect();
+    const user = await User.findOne({ email: tokenData.email });
+    if (!user) {
+      console.log('User not found for email:', tokenData.email);
+      return { error: 'User not found', status: 404 };
+    }
+
+    console.log('User found:', user._id);
+    return { user: { id: user._id, email: user.email, organizations: user.organizations, defaultOrgId: user.defaultOrgId } };
   } catch (error) {
     console.error('Token verification failed:', error);
     return { error: 'Invalid token', status: 401 };
@@ -29,6 +41,6 @@ export const createToken = (user) => {
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
-  console.log('Token created:', token);
+  console.log('JWT created (unused for now):', token);
   return token;
 };

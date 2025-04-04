@@ -19,11 +19,12 @@ export default function LandingPage() {
     flow: 'implicit',
     redirect_uri: 'http://localhost:3000/auth/callback',
     onSuccess: async (tokenResponse) => {
+      const toastId = toast.loading(isSignIn ? 'Logging in...' : 'Creating organization...');
       try {
         const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-          credentials: 'include',
         });
+        if (!res.ok) throw new Error(`Google fetch failed: ${res.status}`);
         const userData = await res.json();
         console.log('Google user data:', userData);
 
@@ -32,6 +33,7 @@ export default function LandingPage() {
           given_name: userData.given_name,
           family_name: userData.family_name,
           picture: userData.picture,
+          googleToken: tokenResponse.access_token,
           ...(isSignIn ? {} : { username, organizationId: joinOrg ? orgId : null, organizationName: joinOrg ? null : orgName, token: verifyToken }),
         };
 
@@ -41,18 +43,17 @@ export default function LandingPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-          credentials: 'include',
         });
 
         const result = await authRes.json();
-        const cookieHeader = authRes.headers.get('Set-Cookie');
-        console.log('Auth response:', { status: authRes.status, result, cookie: cookieHeader });
+        console.log('Auth response:', { status: authRes.status, result });
         if (!authRes.ok) throw new Error(result.error || `Failed to ${isSignIn ? 'sign in' : (joinOrg ? 'join' : 'create')} - Status: ${authRes.status}`);
 
-        router.push(`/dashboard?orgId=${result.orgId || result.defaultOrgId}`);
+        toast.update(toastId, { render: 'Success!', type: 'success', isLoading: false, autoClose: 2000 });
+        router.push(`/dashboard?orgId=${result.orgId || result.defaultOrgId}&token=${tokenResponse.access_token}&user=${encodeURIComponent(JSON.stringify(result.user))}`);
       } catch (error) {
         console.error('Login error:', error);
-        toast.error(`Login failed: ${error.message}`);
+        toast.update(toastId, { render: `Login failed: ${error.message}`, type: 'error', isLoading: false, autoClose: 3000 });
       }
     },
     onError: () => {
