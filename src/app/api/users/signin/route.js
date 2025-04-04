@@ -1,6 +1,6 @@
 // src/app/api/users/signin/route.js
 import dbConnect from '../../../../lib/db';
-import { User } from '../../../../lib/models';
+import { User, Category, Transaction } from '../../../../lib/models';
 
 export async function POST(req) {
   try {
@@ -24,6 +24,9 @@ export async function POST(req) {
     await user.save();
     console.log('User updated:', user._id);
 
+    const categories = await Category.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
+    const transactions = await Transaction.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
+
     return new Response(JSON.stringify({ 
       message: 'Signed in', 
       userId: user._id, 
@@ -34,9 +37,24 @@ export async function POST(req) {
         email: user.email, 
         given_name: user.given_name, 
         family_name: user.family_name, 
-        username: user.username
+        username: user.username || user.email, 
         organizations: user.organizations.map(o => ({ ...o.toObject(), name: null })), 
-        defaultOrgId: user.defaultOrgId 
+        defaultOrgId: user.defaultOrgId,
+        categories: categories.map(c => ({
+          _id: c._id,
+          name: c.name,
+          base_amount: c.base_amount,
+          remaining_budget: c.remaining_budget,
+          organization_id: c.organization_id
+        })),
+        transactions: transactions.map(t => ({
+          _id: t._id,
+          item: t.item,
+          price: t.price,
+          category_id: t.category_id,
+          organization_id: t.organization_id,
+          username: t.username
+        }))
       } 
     }), { status: 200 });
   } catch (error) {

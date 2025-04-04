@@ -2,11 +2,10 @@
   "name": "budget-app-js-4.0",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "node socket.js",
+"scripts": {
+    "dev": "next dev",
     "build": "next build",
-    "start": "NODE_ENV=production node socket.js",
-    "lint": "next lint"
+    "start": "next start"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",

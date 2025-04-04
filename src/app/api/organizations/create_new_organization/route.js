@@ -62,8 +62,11 @@ export async function POST(req) {
         email: user.email, 
         given_name: user.given_name, 
         family_name: user.family_name, 
+        username: user.username || user.email, 
         organizations: [{ organization: org._id, role: 'owner', name: organizationName }], 
-        defaultOrgId: org._id 
+        defaultOrgId: org._id,
+        categories: [], // Empty initially
+        transactions: [] // Empty initially
       } 
     }), { status: 201 });
   } catch (error) {

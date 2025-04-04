@@ -1,6 +1,6 @@
 // src/app/api/organizations/join_organization/route.js
 import dbConnect from '../../../../lib/db';
-import  {User, Organization} from '../../../../lib/models';
+import { User, Organization, Category, Transaction } from '../../../../lib/models';
 
 export async function POST(req) {
   try {
@@ -22,6 +22,8 @@ export async function POST(req) {
       if (alreadyInOrg) {
         console.log('User already in org:', user._id);
         const org = await Organization.findById(organizationId);
+        const categories = await Category.find({ organization_id: organizationId });
+        const transactions = await Transaction.find({ organization_id: organizationId });
         return new Response(JSON.stringify({ 
           message: 'User already in organization', 
           userId: user._id, 
@@ -32,8 +34,24 @@ export async function POST(req) {
             email: user.email, 
             given_name: user.given_name, 
             family_name: user.family_name, 
+            username: user.username || user.email, 
             organizations: user.organizations.map(o => ({ ...o.toObject(), name: o.organization.toString() === organizationId ? org.name : null })), 
-            defaultOrgId: user.defaultOrgId 
+            defaultOrgId: user.defaultOrgId,
+            categories: categories.map(c => ({
+              _id: c._id,
+              name: c.name,
+              base_amount: c.base_amount,
+              remaining_budget: c.remaining_budget,
+              organization_id: c.organization_id
+            })),
+            transactions: transactions.map(t => ({
+              _id: t._id,
+              item: t.item,
+              price: t.price,
+              category_id: t.category_id,
+              organization_id: t.organization_id,
+              username: t.username
+            }))
           } 
         }), { status: 200 });
       }
@@ -55,6 +73,9 @@ export async function POST(req) {
     await Promise.all([user.save(), org.save()]);
     console.log('User and org updated:', user._id, org._id);
 
+    const categories = await Category.find({ organization_id: organizationId });
+    const transactions = await Transaction.find({ organization_id: organizationId });
+
     return new Response(JSON.stringify({ 
       message: 'Joined organization', 
       userId: user._id, 
@@ -65,8 +86,24 @@ export async function POST(req) {
         email: user.email, 
         given_name: user.given_name, 
         family_name: user.family_name, 
+        username: user.username || user.email, 
         organizations: user.organizations.map(o => ({ ...o.toObject(), name: o.organization.toString() === organizationId ? org.name : null })), 
-        defaultOrgId: user.defaultOrgId 
+        defaultOrgId: user.defaultOrgId,
+        categories: categories.map(c => ({
+          _id: c._id,
+          name: c.name,
+          base_amount: c.base_amount,
+          remaining_budget: c.remaining_budget,
+          organization_id: c.organization_id
+        })),
+        transactions: transactions.map(t => ({
+          _id: t._id,
+          item: t.item,
+          price: t.price,
+          category_id: t.category_id,
+          organization_id: t.organization_id,
+          username: t.username
+        }))
       } 
     }), { status: 201 });
   } catch (error) {

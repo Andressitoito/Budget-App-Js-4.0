@@ -1,6 +1,6 @@
 // src/app/api/users/me/route.js
 import dbConnect from '../../../../../lib/db';
-import { User } from '../../../../../lib/models';
+import { User, Category, Transaction } from '../../../../../lib/models';
 import { authMiddleware } from '../../../../../lib/auth';
 
 export async function GET(req) {
@@ -16,6 +16,10 @@ export async function GET(req) {
       return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 });
     }
 
+    // Fetch categories and transactions for user's organizations
+    const categories = await Category.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
+    const transactions = await Transaction.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
+
     console.log('User fetched:', user._id);
     return new Response(JSON.stringify({ 
       user: { 
@@ -23,13 +27,28 @@ export async function GET(req) {
         email: user.email, 
         given_name: user.given_name, 
         family_name: user.family_name, 
-        username: user.username, 
+        username: user.username || user.email, 
         organizations: user.organizations.map(o => ({ 
           organization: o.organization._id, 
           role: o.role, 
           name: o.organization.name 
         })), 
-        defaultOrgId: user.defaultOrgId 
+        defaultOrgId: user.defaultOrgId,
+        categories: categories.map(c => ({
+          _id: c._id,
+          name: c.name,
+          base_amount: c.base_amount,
+          remaining_budget: c.remaining_budget,
+          organization_id: c.organization_id
+        })),
+        transactions: transactions.map(t => ({
+          _id: t._id,
+          item: t.item,
+          price: t.price,
+          category_id: t.category_id,
+          organization_id: t.organization_id,
+          username: t.username
+        }))
       } 
     }), { status: 200 });
   } catch (error) {

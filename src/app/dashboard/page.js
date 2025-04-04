@@ -14,6 +14,13 @@ import { toast } from 'react-toastify';
 
 const Modal = dynamic(() => import('../../components/modals/Modal'), { ssr: false });
 
+const socket = io('http://localhost:3000', {
+  path: '/socket.io',
+  transports: ['websocket', 'polling'],
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+});
+
 export default function Dashboard() {
   const { 
     categories: storeCategories, 
@@ -42,8 +49,10 @@ export default function Dashboard() {
         return;
       }
 
+      // Initialize socket server
+      await fetch('/api/socket');
+
       if (!userData) {
-        // Fetch user data if not in URL (e.g., after refresh)
         try {
           const res = await fetch('/api/users/me', {
             headers: { 'Authorization': `Bearer ${token}` },
@@ -64,36 +73,41 @@ export default function Dashboard() {
 
       if (isInitialMount.current) {
         setSelectedOrgId(orgId);
-        setCategories([]); // Start empty, socket will populate
-        setTransactions([]);
+        const initialCategories = userData.categories || [];
+        const initialTransactions = userData.transactions || [];
+        setCategories(initialCategories);
+        setTransactions(initialTransactions);
+        if (initialCategories.length > 0 && !selectedCategory) {
+          setSelectedCategory(initialCategories[0]);
+        }
         isInitialMount.current = false;
       }
-
-      const socket = io('http://localhost:3000', {
-        path: '/socket.io',
-        transports: ['websocket', 'polling'],
-      });
 
       socket.on('connect', () => {
         console.log('Connected to Socket.io');
         socket.emit('joinOrganization', orgId);
       });
+
       socket.on('newTransaction', (transaction) => {
         console.log('New transaction received:', transaction);
         addTransaction(transaction);
         setTransactions([...storeTransactions.filter(t => t._id !== transaction._id), transaction]);
       });
+
       socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
         console.log(`Transactions deleted for category ${category_id}, count: ${deletedCount}`);
         removeTransactions(category_id);
-        setTransactions([...storeTransactions.filter(t => t.category_id !== category_id)]);
+        const newTransactions = storeTransactions.filter(t => t.category_id !== category_id);
+        setTransactions(newTransactions);
       });
+
       socket.on('newCategory', (category) => {
         console.log('New category received:', category);
         addCategory(category);
         setCategories([...storeCategories.filter(c => c._id !== category._id), category]);
         if (!selectedCategory) setSelectedCategory(category);
       });
+
       socket.on('categoryDeleted', ({ category_id }) => {
         console.log(`Category deleted: ${category_id}`);
         removeCategory(category_id);
@@ -102,6 +116,7 @@ export default function Dashboard() {
         setCategories(newCategories);
         setSelectedCategory(newCategories[0] || null);
       });
+
       socket.on('categoryUpdated', (updatedCategory) => {
         console.log('Category updated:', updatedCategory);
         updateCategory(updatedCategory);
@@ -110,22 +125,36 @@ export default function Dashboard() {
         }
         setCategories([...storeCategories]);
       });
+
       socket.on('transactionUpdated', (transaction) => {
         console.log('Transaction updated:', transaction);
         updateTransaction(transaction);
         const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
         setTransactions(updatedTransactions);
       });
+
       socket.on('transactionDeleted', ({ transaction_id }) => {
         console.log('Transaction deleted:', transaction_id);
         removeTransaction(transaction_id);
         setTransactions([...storeTransactions.filter(t => t._id !== transaction_id)]);
       });
+
       socket.on('connect_error', (err) => {
         console.error('Socket connection error:', err);
+        toast.error('Lost connection to server, retrying...');
       });
 
-      return () => socket.disconnect();
+      return () => {
+        socket.off('connect');
+        socket.off('newTransaction');
+        socket.off('transactionsDeleted');
+        socket.off('newCategory');
+        socket.off('categoryDeleted');
+        socket.off('categoryUpdated');
+        socket.off('transactionUpdated');
+        socket.off('transactionDeleted');
+        socket.off('connect_error');
+      };
     };
 
     loadInitialData();
@@ -178,7 +207,7 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded-lg shadow-md mb-6 w-full max-w-md">
           <p className="text-gray-700">Welcome, {userData?.given_name} {userData?.family_name}</p>
           <p className="text-sm text-gray-500">
-            Organization: {userData?.organizations.find(o => o.organization.toString() === orgId)?.name || 'Loading...'}
+            Organization: {userData?.organizations.find(o => o.organization.toString() === orgId)?.name || 'Unknown'}
           </p>
         </div>
         {selectedCategory ? (
