@@ -1,8 +1,7 @@
 // src/app/api/transactions/create_transaction/route.js
-import dbConnect from '../../../../../lib/db';
-import { Transaction } from '../../../../../lib/models';
-import { authMiddleware } from '../../../../../lib/auth';
-import { getIO } from '../../../../../lib/socket';
+import dbConnect from '../../../../lib/db';
+import { Transaction } from '../../../../lib/models';
+import { authMiddleware } from '../../../../lib/auth';
 
 export async function POST(req) {
   try {
@@ -22,8 +21,12 @@ export async function POST(req) {
     await transaction.save();
     console.log('Transaction created:', transaction._id);
 
-    const io = getIO();
-    io.to(organization_id).emit('newTransaction', transaction);
+    const io = global.io;
+    if (io) {
+      io.to(organization_id).emit('newTransaction', transaction);
+    } else {
+      console.error('Socket.IO not available');
+    }
 
     return new Response(JSON.stringify({ message: 'Transaction created', transaction }), { status: 201 });
   } catch (error) {

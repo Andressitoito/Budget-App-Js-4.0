@@ -20,6 +20,10 @@ export async function GET(req) {
     const categories = await Category.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
     const transactions = await Transaction.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
 
+    // Derive defaultOrgName from defaultOrgId
+    const defaultOrg = user.organizations.find(o => o.organization._id.toString() === user.defaultOrgId.toString());
+    const defaultOrgName = defaultOrg ? defaultOrg.organization.name : 'Unknown';
+
     console.log('User fetched:', user._id);
     return new Response(JSON.stringify({ 
       user: { 
@@ -34,6 +38,7 @@ export async function GET(req) {
           name: o.organization.name 
         })), 
         defaultOrgId: user.defaultOrgId,
+        defaultOrgName, // Added derived name
         categories: categories.map(c => ({
           _id: c._id,
           name: c.name,

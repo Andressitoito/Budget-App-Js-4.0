@@ -1,5 +1,5 @@
 // src/app/dashboard/configs.js
-export const createTransactionConfig = (category, organizationId, username) => ({
+export const createTransactionConfig = (category, organizationId, username, token) => ({
   title: 'Create Transaction',
   fields: [
     { label: 'Item', name: 'item', type: 'text' },
@@ -10,10 +10,11 @@ export const createTransactionConfig = (category, organizationId, username) => (
   action: 'create transaction',
   initialData: { category_id: category._id, organization_id: organizationId, username },
   organization_id: organizationId,
+  token, // Pass token for auth
   submitLabel: 'Create',
 });
 
-export const createCategoryConfig = (organizationId) => ({
+export const createCategoryConfig = (organizationId, token) => ({
   title: 'Create Category',
   fields: [
     { label: 'Name', name: 'name', type: 'text' },
@@ -24,10 +25,11 @@ export const createCategoryConfig = (organizationId) => ({
   action: 'create category',
   initialData: { organization_id: organizationId },
   organization_id: organizationId,
+  token, // Pass token for auth
   submitLabel: 'Create',
 });
 
-export const editCategoryConfig = (category, organizationId) => ({
+export const editCategoryConfig = (category, organizationId, token) => ({
   title: 'Edit Category',
   fields: [
     { label: 'Name', name: 'name', type: 'text', value: category.name },
@@ -38,10 +40,11 @@ export const editCategoryConfig = (category, organizationId) => ({
   action: 'update category',
   initialData: { category_id: category._id, organization_id: organizationId },
   organization_id: organizationId,
+  token, // Pass token for auth
   submitLabel: 'Save',
 });
 
-export const deleteCategoryConfig = (category, organizationId) => ({
+export const deleteCategoryConfig = (category, organizationId, token) => ({
   title: 'Confirm Delete Category',
   fields: [],
   endpoint: '/api/categories/delete_category',
@@ -49,5 +52,6 @@ export const deleteCategoryConfig = (category, organizationId) => ({
   action: 'delete category',
   initialData: { category_id: category._id, organization_id: organizationId },
   organization_id: organizationId,
+  token, // Pass token for auth
   submitLabel: 'Delete',
 });

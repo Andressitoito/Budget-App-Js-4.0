@@ -1,8 +1,7 @@
 // src/app/api/transactions/delete_all_transactions/route.js
-import dbConnect from '../../../../../lib/db';
-import { Transaction } from '../../../../../lib/models';
-import { authMiddleware } from '../../../../../lib/auth';
-import { getIO, setIO } from '../../../../../lib/socket';
+import dbConnect from '../../../../lib/db';
+import { Transaction } from '../../../../lib/models';
+import { authMiddleware } from '../../../../lib/auth';
 
 export async function DELETE(req) {
   try {
@@ -21,8 +20,12 @@ export async function DELETE(req) {
     const result = await Transaction.deleteMany({ category_id, organization_id });
     console.log(`Deleted ${result.deletedCount} transactions for category ${category_id} in org ${organization_id}`);
 
-    const io = getIO();
-    io.to(organization_id).emit('transactionsDeleted', { category_id, deletedCount: result.deletedCount });
+    const io = global.io;
+    if (io) {
+      io.to(organization_id).emit('transactionsDeleted', { category_id, deletedCount: result.deletedCount });
+    } else {
+      console.error('Socket.IO not available');
+    }
 
     return new Response(JSON.stringify({ message: 'Transactions deleted', deletedCount: result.deletedCount }), { status: 200 });
   } catch (error) {

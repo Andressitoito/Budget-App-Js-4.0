@@ -49,15 +49,6 @@ export default function Dashboard() {
         return;
       }
 
-      // Initialize socket server
-      try {
-        const res = await fetch('/api/socket');
-        if (!res.ok) throw new Error('Failed to initialize socket');
-      } catch (error) {
-        console.error('Socket init error:', error);
-        toast.error('Failed to connect to real-time updates');
-      }
-
       if (!userData) {
         try {
           const res = await fetch('/api/users/me', {
@@ -190,7 +181,7 @@ export default function Dashboard() {
   };
 
   const openCreateModal = () => {
-    setModalConfig(createCategoryConfig(orgId));
+    setModalConfig(createCategoryConfig(orgId, token));
     setIsModalOpen(true);
   };
 
@@ -203,6 +194,7 @@ export default function Dashboard() {
       action: 'delete all transactions',
       initialData: { category_id: selectedCategory?._id, organization_id: orgId },
       organization_id: orgId,
+      token, // Pass token for auth
       submitLabel: 'Delete All',
     });
     setIsModalOpen(true);
@@ -221,7 +213,7 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded-lg shadow-md mb-6 w-full max-w-md">
           <p className="text-gray-700">Welcome, {userData?.given_name} {userData?.family_name}</p>
           <p className="text-sm text-gray-500">
-            Organization: {userData?.organizations.find(o => o.organization.toString() === orgId)?.name || 'Unknown'}
+            Organization: {userData?.defaultOrgName || 'Unknown'} {/* Simplified */}
           </p>
         </div>
         {selectedCategory ? (
@@ -237,7 +229,7 @@ export default function Dashboard() {
               <button
                 className="mt-4 bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600"
                 onClick={() => { 
-                  setModalConfig(createTransactionConfig(selectedCategory, orgId, userData?.username || userData?.email)); 
+                  setModalConfig(createTransactionConfig(selectedCategory, orgId, userData?.username || userData?.email, token)); 
                   setIsModalOpen(true); 
                 }}
               >
@@ -246,13 +238,13 @@ export default function Dashboard() {
               <div className="absolute top-4 right-4 flex space-x-2">
                 <button
                   className="bg-yellow-500 text-white p-2 rounded-full hover:bg-yellow-600"
-                  onClick={() => { setModalConfig(editCategoryConfig(selectedCategory, orgId)); setIsModalOpen(true); }}
+                  onClick={() => { setModalConfig(editCategoryConfig(selectedCategory, orgId, token)); setIsModalOpen(true); }}
                 >
                   <AiOutlineEdit size={20} />
                 </button>
                 <button
                   className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600"
-                  onClick={() => { setModalConfig(deleteCategoryConfig(selectedCategory, orgId)); setIsModalOpen(true); }}
+                  onClick={() => { setModalConfig(deleteCategoryConfig(selectedCategory, orgId, token)); setIsModalOpen(true); }}
                 >
                   <AiOutlineDelete size={20} />
                 </button>
