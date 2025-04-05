@@ -1,51 +1,49 @@
 // src/app/api/categories/update_category/route.js
 import dbConnect from '../../../../lib/db';
 import { Category } from '../../../../lib/models';
+import { authMiddleware } from '../../../../lib/auth';
 
 export async function POST(req) {
   try {
-    await dbConnect();
+    const authResult = await authMiddleware(req);
+    if (authResult.error) {
+      return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    }
+
     const { category_id, name, base_amount, organization_id } = await req.json();
 
-    // Validate inputs
-    if (!category_id) {
-      return new Response(JSON.stringify({ error: 'Category ID is required' }), { status: 400 });
-    }
-    if (!name && base_amount === undefined) {
-      return new Response(JSON.stringify({ error: 'At least one field (name or base_amount) is required to update' }), { status: 400 });
-    }
-    if (!organization_id) {
-      return new Response(JSON.stringify({ error: 'Organization ID is required' }), { status: 400 });
+    console.log('Updating category:', { category_id, name, base_amount, organization_id });
+
+    if (!category_id || !name || base_amount === undefined || !organization_id) {
+      return new Response(JSON.stringify({ error: 'All fields are required' }), { status: 400 });
     }
 
-    // Find the category and ensure it belongs to the organization
-    const category = await Category.findOne({ 
-      _id: category_id, 
-      organization_id 
-    });
-    if (!category) {
-      return new Response(JSON.stringify({ error: 'Category not found or access denied' }), { status: 404 });
+    await dbConnect();
+    const updatedCategory = await Category.findByIdAndUpdate(
+      category_id,
+      { name, base_amount },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedCategory) {
+      return new Response(JSON.stringify({ error: 'Category not found' }), { status: 404 });
     }
 
-    // Update fields if provided
-    if (name) category.name = name;
-    if (base_amount !== undefined) {
-      category.base_amount = base_amount;
-      category.remaining_budget = base_amount - category.spent_amount;
-    }
-
-    // Save the updated category
-    await category.save();
-
-    // Emit socket event with the updated category
     if (global.io) {
-      global.io.to(organization_id).emit('categoryUpdated', category.toObject());
+      const categoryData = updatedCategory.toObject();
+      console.log('Emitting categoryUpdated:', { categoryData, to: organization_id });
+      global.io.to(organization_id).emit('categoryUpdated', categoryData);
+      console.log(`Emit sent to organization: ${organization_id}`);
+    } else {
+      console.error('Socket.IO not available');
     }
 
-    // Return the updated category
-    return new Response(JSON.stringify(category.toObject()), { status: 200 });
+    return new Response(JSON.stringify({
+      message: `${name} was successfully updated`,
+      category: updatedCategory.toObject(),
+    }), { status: 200 });
   } catch (error) {
-    console.error('Error updating category:', error);
+    console.error('Update category error:', error.stack);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }

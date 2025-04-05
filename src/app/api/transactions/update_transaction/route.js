@@ -27,6 +27,7 @@ export async function POST(req) {
       const transactionData = updatedTransaction.toObject();
       console.log('Emitting transactionUpdated:', { transactionData, to: organization_id });
       global.io.to(organization_id).emit('transactionUpdated', transactionData);
+      console.log(`Emit sent to organization: ${organization_id}`);
     } else {
       console.error('Socket.IO not available');
     }
