@@ -49,22 +49,21 @@ export default function Dashboard() {
         return;
       }
 
-      // Always re-fetch userData to ensure freshness
-      try {
-        const res = await fetch('/api/users/me', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Failed to fetch user data');
-        const data = await res.json();
-        setUserData(data.user);
-        if (!userDataParam || JSON.stringify(data.user) !== userDataParam) {
+      if (!userData || !userData._id) {
+        try {
+          const res = await fetch('/api/users/me', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error('Failed to fetch user data');
+          const data = await res.json();
+          setUserData(data.user);
           router.push(`/dashboard?orgId=${data.user.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
+        } catch (error) {
+          console.error('Fetch user error:', error);
+          toast.error('Please log in again');
+          router.push('/');
+          return;
         }
-      } catch (error) {
-        console.error('Fetch user error:', error);
-        toast.error('Please log in again');
-        router.push('/');
-        return;
       }
 
       console.log('Dashboard loaded with:', { userData, orgId });
@@ -75,16 +74,20 @@ export default function Dashboard() {
         const initialTransactions = (userData.transactions || []).filter(t => t.organization_id.toString() === orgId);
         setCategories(initialCategories);
         setTransactions(initialTransactions);
+        console.log('Initial state set:', { categories: initialCategories, transactions: initialTransactions });
         if (initialCategories.length > 0 && !selectedCategory) {
           setSelectedCategory(initialCategories[0]);
         }
         isInitialMount.current = false;
       }
 
+      // Join organization room immediately
+      console.log('Emitting joinOrganization:', orgId);
+      socket.emit('joinOrganization', orgId);
+
       socket.on('connect', () => {
-        console.log('Connected to Socket.io');
-        socket.emit('joinOrganization', orgId);
-        console.log(`Joined organization: ${orgId}`);
+        console.log('Connected to Socket.io, socket.id:', socket.id);
+        console.log('Socket rooms on connect:', Array.from(socket.rooms));
       });
 
       socket.on('newTransaction', (transaction) => {
@@ -93,7 +96,9 @@ export default function Dashboard() {
           addTransaction(transaction);
           const updatedTransactions = [...storeTransactions.filter(t => t._id !== transaction._id), transaction];
           setTransactions(updatedTransactions);
-          console.log('Updated transactions:', updatedTransactions);
+          console.log('Zustand transactions updated:', updatedTransactions);
+        } else {
+          console.log('Transaction ignored - wrong orgId:', transaction.organization_id, 'expected:', orgId);
         }
       });
 
@@ -102,7 +107,7 @@ export default function Dashboard() {
         removeTransactions(category_id);
         const newTransactions = storeTransactions.filter(t => t.category_id !== category_id);
         setTransactions(newTransactions);
-        console.log('Updated transactions after delete:', newTransactions);
+        console.log('Zustand transactions updated after delete:', newTransactions);
       });
 
       socket.on('newCategory', (category) => {
@@ -112,7 +117,9 @@ export default function Dashboard() {
           const updatedCategories = [...storeCategories.filter(c => c._id !== category._id), category];
           setCategories(updatedCategories);
           if (!selectedCategory) setSelectedCategory(category);
-          console.log('Updated categories:', updatedCategories);
+          console.log('Zustand categories updated:', updatedCategories);
+        } else {
+          console.log('Category ignored - wrong orgId:', category.organization_id);
         }
       });
 
@@ -123,7 +130,7 @@ export default function Dashboard() {
         const newCategories = storeCategories.filter(c => c._id !== category_id);
         setCategories(newCategories);
         setSelectedCategory(newCategories[0] || null);
-        console.log('Updated categories after delete:', newCategories);
+        console.log('Zustand categories updated after delete:', newCategories);
       });
 
       socket.on('categoryUpdated', (updatedCategory) => {
@@ -135,7 +142,7 @@ export default function Dashboard() {
           }
           const updatedCategories = [...storeCategories];
           setCategories(updatedCategories);
-          console.log('Updated categories:', updatedCategories);
+          console.log('Zustand categories updated:', updatedCategories);
         }
       });
 
@@ -146,8 +153,10 @@ export default function Dashboard() {
           const updatedTransactions = storeTransactions.map(t => 
             t._id === transaction._id ? transaction : t
           );
-          setTransactions([...updatedTransactions]); // Fresh array to force update
-          console.log('Updated transactions:', updatedTransactions);
+          setTransactions([...updatedTransactions]);
+          console.log('Zustand transactions updated:', updatedTransactions);
+        } else {
+          console.log('Transaction update ignored - wrong orgId:', transaction.organization_id);
         }
       });
 
@@ -156,7 +165,7 @@ export default function Dashboard() {
         removeTransaction(transaction_id);
         const newTransactions = storeTransactions.filter(t => t._id !== transaction_id);
         setTransactions(newTransactions);
-        console.log('Updated transactions after delete:', newTransactions);
+        console.log('Zustand transactions updated after delete:', newTransactions);
       });
 
       socket.on('connect_error', (err) => {

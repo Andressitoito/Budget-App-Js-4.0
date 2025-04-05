@@ -12,6 +12,8 @@ export async function POST(req) {
 
     const { item, price, category_id, organization_id, username } = await req.json();
 
+    console.log('Creating transaction:', { item, price, category_id, organization_id, username });
+
     if (!item || !price || !category_id || !organization_id || !username) {
       return new Response(JSON.stringify({ error: 'All fields are required' }), { status: 400 });
     }
@@ -21,14 +23,16 @@ export async function POST(req) {
     await transaction.save();
     console.log('Transaction created:', transaction._id);
 
-    const io = global.io;
-    if (io) {
-      io.to(organization_id).emit('newTransaction', transaction);
+    if (global.io) {
+      const transactionData = transaction.toObject();
+      console.log('Emitting newTransaction:', { transactionData, to: organization_id });
+      global.io.to(organization_id).emit('newTransaction', transactionData);
+      console.log(`Emit sent to organization: ${organization_id}`);
     } else {
       console.error('Socket.IO not available');
     }
 
-    return new Response(JSON.stringify({ message: 'Transaction created', transaction }), { status: 201 });
+    return new Response(JSON.stringify({ message: 'Transaction created', transaction: transaction.toObject() }), { status: 201 });
   } catch (error) {
     console.error('Create transaction error:', error.stack);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
