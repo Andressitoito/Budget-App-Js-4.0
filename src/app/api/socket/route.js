@@ -1,18 +1,16 @@
 // src/app/api/socket/route.js
 import { Server } from 'socket.io';
-
-export const config = {
-  api: {
-    bodyParser: false, // Required for WebSocket
-  },
-};
+import { NextResponse } from 'next/server';
 
 let io;
 
 export async function GET(req) {
+  const res = NextResponse.next();
+
   if (!io) {
-    const { socket: { server } } = req;
-    io = new Server(server, {
+    // Access the underlying HTTP server from Next.js
+    const httpServer = req.socket.server;
+    io = new Server(httpServer, {
       path: '/socket.io',
       cors: { origin: 'http://localhost:3000', methods: ['GET', 'POST'] },
     });
@@ -65,8 +63,10 @@ export async function GET(req) {
       });
     });
 
+    // Attach io to res for other routes to access
+    res.socket = { server: httpServer, io };
     console.log('Socket.io initialized on Next.js server (port 3000)');
   }
 
-  return new Response('Socket.IO server running', { status: 200 });
+  return res;
 }

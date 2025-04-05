@@ -50,7 +50,13 @@ export default function Dashboard() {
       }
 
       // Initialize socket server
-      await fetch('/api/socket');
+      try {
+        const res = await fetch('/api/socket');
+        if (!res.ok) throw new Error('Failed to initialize socket');
+      } catch (error) {
+        console.error('Socket init error:', error);
+        toast.error('Failed to connect to real-time updates');
+      }
 
       if (!userData) {
         try {
@@ -73,8 +79,8 @@ export default function Dashboard() {
 
       if (isInitialMount.current) {
         setSelectedOrgId(orgId);
-        const initialCategories = userData.categories || [];
-        const initialTransactions = userData.transactions || [];
+        const initialCategories = (userData.categories || []).filter(c => c.organization_id.toString() === orgId);
+        const initialTransactions = (userData.transactions || []).filter(t => t.organization_id.toString() === orgId);
         setCategories(initialCategories);
         setTransactions(initialTransactions);
         if (initialCategories.length > 0 && !selectedCategory) {
@@ -89,9 +95,11 @@ export default function Dashboard() {
       });
 
       socket.on('newTransaction', (transaction) => {
-        console.log('New transaction received:', transaction);
-        addTransaction(transaction);
-        setTransactions([...storeTransactions.filter(t => t._id !== transaction._id), transaction]);
+        if (transaction.organization_id.toString() === orgId) {
+          console.log('New transaction received:', transaction);
+          addTransaction(transaction);
+          setTransactions([...storeTransactions.filter(t => t._id !== transaction._id), transaction]);
+        }
       });
 
       socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
@@ -102,10 +110,12 @@ export default function Dashboard() {
       });
 
       socket.on('newCategory', (category) => {
-        console.log('New category received:', category);
-        addCategory(category);
-        setCategories([...storeCategories.filter(c => c._id !== category._id), category]);
-        if (!selectedCategory) setSelectedCategory(category);
+        if (category.organization_id.toString() === orgId) {
+          console.log('New category received:', category);
+          addCategory(category);
+          setCategories([...storeCategories.filter(c => c._id !== category._id), category]);
+          if (!selectedCategory) setSelectedCategory(category);
+        }
       });
 
       socket.on('categoryDeleted', ({ category_id }) => {
@@ -118,19 +128,23 @@ export default function Dashboard() {
       });
 
       socket.on('categoryUpdated', (updatedCategory) => {
-        console.log('Category updated:', updatedCategory);
-        updateCategory(updatedCategory);
-        if (selectedCategory?._id === updatedCategory._id) {
-          setSelectedCategory(updatedCategory);
+        if (updatedCategory.organization_id.toString() === orgId) {
+          console.log('Category updated:', updatedCategory);
+          updateCategory(updatedCategory);
+          if (selectedCategory?._id === updatedCategory._id) {
+            setSelectedCategory(updatedCategory);
+          }
+          setCategories([...storeCategories]);
         }
-        setCategories([...storeCategories]);
       });
 
       socket.on('transactionUpdated', (transaction) => {
-        console.log('Transaction updated:', transaction);
-        updateTransaction(transaction);
-        const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
-        setTransactions(updatedTransactions);
+        if (transaction.organization_id.toString() === orgId) {
+          console.log('Transaction updated:', transaction);
+          updateTransaction(transaction);
+          const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
+          setTransactions(updatedTransactions);
+        }
       });
 
       socket.on('transactionDeleted', ({ transaction_id }) => {

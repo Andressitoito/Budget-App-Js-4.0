@@ -2,7 +2,7 @@
 import dbConnect from '../../../../../lib/db';
 import { Transaction } from '../../../../../lib/models';
 import { authMiddleware } from '../../../../../lib/auth';
-import { getIO } from '../../../../../lib/socket';
+import { getIO, setIO } from '../../../../../lib/socket';
 
 export async function DELETE(req) {
   try {

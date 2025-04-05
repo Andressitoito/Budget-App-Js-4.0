@@ -3,7 +3,7 @@ let io;
 
 export const getIO = () => {
   if (!io) {
-    throw new Error('Socket.IO not initialized. Call /api/socket first.');
+    throw new Error('Socket.IO not initialized. Ensure /api/socket is called.');
   }
   return io;
 };

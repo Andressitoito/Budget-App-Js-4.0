@@ -65,8 +65,8 @@ export async function POST(req) {
         username: user.username || user.email, 
         organizations: [{ organization: org._id, role: 'owner', name: organizationName }], 
         defaultOrgId: org._id,
-        categories: [], // Empty initially
-        transactions: [] // Empty initially
+        categories: [],
+        transactions: []
       } 
     }), { status: 201 });
   } catch (error) {
