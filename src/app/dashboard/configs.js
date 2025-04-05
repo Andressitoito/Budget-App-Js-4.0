@@ -10,7 +10,7 @@ export const createTransactionConfig = (category, organizationId, username, toke
   action: 'create transaction',
   initialData: { category_id: category._id, organization_id: organizationId, username },
   organization_id: organizationId,
-  token, // Pass token for auth
+  token,
   submitLabel: 'Create',
 });
 
@@ -25,7 +25,7 @@ export const createCategoryConfig = (organizationId, token) => ({
   action: 'create category',
   initialData: { organization_id: organizationId },
   organization_id: organizationId,
-  token, // Pass token for auth
+  token,
   submitLabel: 'Create',
 });
 
@@ -38,9 +38,9 @@ export const editCategoryConfig = (category, organizationId, token) => ({
   endpoint: '/api/categories/update_category',
   method: 'POST',
   action: 'update category',
-  initialData: { category_id: category._id, organization_id: organizationId },
+  initialData: { category_id: category._id, organization_id: organizationId, name: category.name, base_amount: category.base_amount },
   organization_id: organizationId,
-  token, // Pass token for auth
+  token,
   submitLabel: 'Save',
 });
 
@@ -52,6 +52,18 @@ export const deleteCategoryConfig = (category, organizationId, token) => ({
   action: 'delete category',
   initialData: { category_id: category._id, organization_id: organizationId },
   organization_id: organizationId,
-  token, // Pass token for auth
+  token,
+  submitLabel: 'Delete',
+});
+
+export const deleteTransactionConfig = (transaction, organizationId, token) => ({
+  title: 'Confirm Delete Transaction',
+  fields: [],
+  endpoint: '/api/transactions/delete_transaction',
+  method: 'DELETE',
+  action: 'delete transaction',
+  initialData: { transaction_id: transaction._id, organization_id: organizationId },
+  organization_id: organizationId,
+  token,
   submitLabel: 'Delete',
 });

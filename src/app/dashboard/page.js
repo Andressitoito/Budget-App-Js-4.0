@@ -7,7 +7,7 @@ import useAppStore from '../../stores/appStore';
 import dynamic from 'next/dynamic';
 import CategoryList from '../../components/category/CategoryList';
 import TransactionList from '../../components/transactions/TransactionList';
-import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig } from './configs';
+import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig, deleteTransactionConfig } from './configs';
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineDelete } from 'react-icons/ai';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-toastify';
@@ -81,7 +81,6 @@ export default function Dashboard() {
         isInitialMount.current = false;
       }
 
-      // Join organization room immediately
       console.log('Emitting joinOrganization:', orgId);
       socket.emit('joinOrganization', orgId);
 
@@ -286,6 +285,10 @@ export default function Dashboard() {
               <TransactionList
                 transactions={storeTransactions}
                 categoryId={selectedCategory._id}
+                onDelete={(transaction) => {
+                  setModalConfig(deleteTransactionConfig(transaction, orgId, token));
+                  setIsModalOpen(true);
+                }}
               />
             </div>
           </>
