@@ -11,7 +11,7 @@ export async function POST(req) {
     await dbConnect();
     console.log('DB connected');
 
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email }).populate('organizations.organization');
     if (!user) {
       console.log('User not found:', email);
       return new Response(JSON.stringify({ error: 'User not found, please register' }), { status: 404 });
@@ -27,6 +27,10 @@ export async function POST(req) {
     const categories = await Category.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
     const transactions = await Transaction.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
 
+    // Derive defaultOrgName from defaultOrgId
+    const defaultOrg = user.organizations.find(o => o.organization._id.toString() === user.defaultOrgId.toString());
+    const defaultOrgName = defaultOrg ? defaultOrg.organization.name : 'Unknown';
+
     return new Response(JSON.stringify({ 
       message: 'Signed in', 
       userId: user._id, 
@@ -38,8 +42,13 @@ export async function POST(req) {
         given_name: user.given_name, 
         family_name: user.family_name, 
         username: user.username || user.email, 
-        organizations: user.organizations.map(o => ({ ...o.toObject(), name: null })), 
+        organizations: user.organizations.map(o => ({ 
+          organization: o.organization._id, 
+          role: o.role, 
+          name: o.organization.name // Populate name
+        })), 
         defaultOrgId: user.defaultOrgId,
+        defaultOrgName, // Add derived name
         categories: categories.map(c => ({
           _id: c._id,
           name: c.name,

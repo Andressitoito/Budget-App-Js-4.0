@@ -23,43 +23,51 @@ app.prepare().then(() => {
     console.log('Client connected:', socket.id);
 
     socket.on('joinOrganization', (orgId) => {
-      console.log(`Client ${socket.id} joined organization: ${orgId}`);
+      console.log(`Client ${socket.id} joining organization: ${orgId}`);
       socket.join(orgId);
+      console.log(`Client ${socket.id} joined rooms:`, socket.rooms);
     });
 
     socket.on('newTransaction', (transaction) => {
-      console.log('Emitting newTransaction:', transaction);
+      console.log('Received newTransaction:', transaction);
       io.to(transaction.organization_id).emit('newTransaction', transaction);
+      console.log(`Emitted newTransaction to ${transaction.organization_id}`);
     });
 
     socket.on('transactionsDeleted', (data) => {
-      console.log('Emitting transactionsDeleted:', data);
+      console.log('Received transactionsDeleted:', data);
       io.to(data.organization_id).emit('transactionsDeleted', data);
+      console.log(`Emitted transactionsDeleted to ${data.organization_id}`);
     });
 
     socket.on('newCategory', (category) => {
-      console.log('Emitting newCategory:', category);
+      console.log('Received newCategory:', category);
       io.to(category.organization_id).emit('newCategory', category);
+      console.log(`Emitted newCategory to ${category.organization_id}`);
     });
 
     socket.on('categoryDeleted', (data) => {
-      console.log('Emitting categoryDeleted:', data);
+      console.log('Received categoryDeleted:', data);
       io.to(data.organization_id).emit('categoryDeleted', data);
+      console.log(`Emitted categoryDeleted to ${data.organization_id}`);
     });
 
     socket.on('categoryUpdated', (category) => {
-      console.log('Emitting categoryUpdated:', category);
+      console.log('Received categoryUpdated:', category);
       io.to(category.organization_id).emit('categoryUpdated', category);
+      console.log(`Emitted categoryUpdated to ${category.organization_id}`);
     });
 
     socket.on('transactionUpdated', (transaction) => {
-      console.log('Emitting transactionUpdated:', transaction);
+      console.log('Received transactionUpdated:', transaction);
       io.to(transaction.organization_id).emit('transactionUpdated', transaction);
+      console.log(`Emitted transactionUpdated to ${transaction.organization_id}`);
     });
 
     socket.on('transactionDeleted', (data) => {
-      console.log('Emitting transactionDeleted:', data);
+      console.log('Received transactionDeleted:', data);
       io.to(data.organization_id).emit('transactionDeleted', data);
+      console.log(`Emitted transactionDeleted to ${data.organization_id}`);
     });
 
     socket.on('disconnect', () => {
@@ -67,7 +75,6 @@ app.prepare().then(() => {
     });
   });
 
-  // Export io for API routes
   global.io = io;
 
   server.listen(3000, (err) => {

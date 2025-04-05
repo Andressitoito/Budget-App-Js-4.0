@@ -1,6 +1,6 @@
 // src/app/api/transactions/update_transaction/route.js
-import { updateTransaction } from '../../../../lib/api/transactions/update_transaction';
 import dbConnect from '../../../../lib/db';
+import { Transaction } from '../../../../lib/models';
 
 export async function POST(req) {
   try {
@@ -13,11 +13,22 @@ export async function POST(req) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }
 
-    const updatedTransaction = await updateTransaction({ transaction_id, item, price });
+    const updatedTransaction = await Transaction.findByIdAndUpdate(
+      transaction_id,
+      { item, price },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedTransaction) {
+      return new Response(JSON.stringify({ error: 'Transaction not found' }), { status: 404 });
+    }
 
     if (global.io) {
-      global.io.to(organization_id).emit('transactionUpdated', updatedTransaction.toObject());
-      console.log(`Emitted transactionUpdated to org ${organization_id}`);
+      const transactionData = updatedTransaction.toObject();
+      console.log('Emitting transactionUpdated:', { transactionData, to: organization_id });
+      global.io.to(organization_id).emit('transactionUpdated', transactionData);
+    } else {
+      console.error('Socket.IO not available');
     }
 
     return new Response(JSON.stringify({

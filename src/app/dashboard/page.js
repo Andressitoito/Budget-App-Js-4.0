@@ -49,21 +49,22 @@ export default function Dashboard() {
         return;
       }
 
-      if (!userData) {
-        try {
-          const res = await fetch('/api/users/me', {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (!res.ok) throw new Error('Failed to fetch user data');
-          const data = await res.json();
-          setUserData(data.user);
+      // Always re-fetch userData to ensure freshness
+      try {
+        const res = await fetch('/api/users/me', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch user data');
+        const data = await res.json();
+        setUserData(data.user);
+        if (!userDataParam || JSON.stringify(data.user) !== userDataParam) {
           router.push(`/dashboard?orgId=${data.user.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
-        } catch (error) {
-          console.error('Fetch user error:', error);
-          toast.error('Please log in again');
-          router.push('/');
-          return;
         }
+      } catch (error) {
+        console.error('Fetch user error:', error);
+        toast.error('Please log in again');
+        router.push('/');
+        return;
       }
 
       console.log('Dashboard loaded with:', { userData, orgId });
@@ -83,65 +84,79 @@ export default function Dashboard() {
       socket.on('connect', () => {
         console.log('Connected to Socket.io');
         socket.emit('joinOrganization', orgId);
+        console.log(`Joined organization: ${orgId}`);
       });
 
       socket.on('newTransaction', (transaction) => {
+        console.log('Received newTransaction:', transaction);
         if (transaction.organization_id.toString() === orgId) {
-          console.log('New transaction received:', transaction);
           addTransaction(transaction);
-          setTransactions([...storeTransactions.filter(t => t._id !== transaction._id), transaction]);
+          const updatedTransactions = [...storeTransactions.filter(t => t._id !== transaction._id), transaction];
+          setTransactions(updatedTransactions);
+          console.log('Updated transactions:', updatedTransactions);
         }
       });
 
       socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
-        console.log(`Transactions deleted for category ${category_id}, count: ${deletedCount}`);
+        console.log(`Received transactionsDeleted: category_id=${category_id}, deletedCount=${deletedCount}`);
         removeTransactions(category_id);
         const newTransactions = storeTransactions.filter(t => t.category_id !== category_id);
         setTransactions(newTransactions);
+        console.log('Updated transactions after delete:', newTransactions);
       });
 
       socket.on('newCategory', (category) => {
+        console.log('Received newCategory:', category);
         if (category.organization_id.toString() === orgId) {
-          console.log('New category received:', category);
           addCategory(category);
-          setCategories([...storeCategories.filter(c => c._id !== category._id), category]);
+          const updatedCategories = [...storeCategories.filter(c => c._id !== category._id), category];
+          setCategories(updatedCategories);
           if (!selectedCategory) setSelectedCategory(category);
+          console.log('Updated categories:', updatedCategories);
         }
       });
 
       socket.on('categoryDeleted', ({ category_id }) => {
-        console.log(`Category deleted: ${category_id}`);
+        console.log(`Received categoryDeleted: category_id=${category_id}`);
         removeCategory(category_id);
         removeTransactions(category_id);
         const newCategories = storeCategories.filter(c => c._id !== category_id);
         setCategories(newCategories);
         setSelectedCategory(newCategories[0] || null);
+        console.log('Updated categories after delete:', newCategories);
       });
 
       socket.on('categoryUpdated', (updatedCategory) => {
+        console.log('Received categoryUpdated:', updatedCategory);
         if (updatedCategory.organization_id.toString() === orgId) {
-          console.log('Category updated:', updatedCategory);
           updateCategory(updatedCategory);
           if (selectedCategory?._id === updatedCategory._id) {
             setSelectedCategory(updatedCategory);
           }
-          setCategories([...storeCategories]);
+          const updatedCategories = [...storeCategories];
+          setCategories(updatedCategories);
+          console.log('Updated categories:', updatedCategories);
         }
       });
 
       socket.on('transactionUpdated', (transaction) => {
+        console.log('Received transactionUpdated:', transaction);
         if (transaction.organization_id.toString() === orgId) {
-          console.log('Transaction updated:', transaction);
           updateTransaction(transaction);
-          const updatedTransactions = storeTransactions.map(t => t._id === transaction._id ? transaction : t);
-          setTransactions(updatedTransactions);
+          const updatedTransactions = storeTransactions.map(t => 
+            t._id === transaction._id ? transaction : t
+          );
+          setTransactions([...updatedTransactions]); // Fresh array to force update
+          console.log('Updated transactions:', updatedTransactions);
         }
       });
 
       socket.on('transactionDeleted', ({ transaction_id }) => {
-        console.log('Transaction deleted:', transaction_id);
+        console.log(`Received transactionDeleted: transaction_id=${transaction_id}`);
         removeTransaction(transaction_id);
-        setTransactions([...storeTransactions.filter(t => t._id !== transaction_id)]);
+        const newTransactions = storeTransactions.filter(t => t._id !== transaction_id);
+        setTransactions(newTransactions);
+        console.log('Updated transactions after delete:', newTransactions);
       });
 
       socket.on('connect_error', (err) => {
@@ -194,7 +209,7 @@ export default function Dashboard() {
       action: 'delete all transactions',
       initialData: { category_id: selectedCategory?._id, organization_id: orgId },
       organization_id: orgId,
-      token, // Pass token for auth
+      token,
       submitLabel: 'Delete All',
     });
     setIsModalOpen(true);
@@ -213,7 +228,7 @@ export default function Dashboard() {
         <div className="bg-white p-4 rounded-lg shadow-md mb-6 w-full max-w-md">
           <p className="text-gray-700">Welcome, {userData?.given_name} {userData?.family_name}</p>
           <p className="text-sm text-gray-500">
-            Organization: {userData?.defaultOrgName || 'Unknown'} {/* Simplified */}
+            Organization: {userData?.defaultOrgName || 'Unknown'}
           </p>
         </div>
         {selectedCategory ? (
