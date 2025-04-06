@@ -1,30 +1,35 @@
 // src/app/api/users/me/route.js
-import dbConnect from '../../../../../lib/db';
-import { User, Category, Transaction } from '../../../../../lib/models';
-import { authMiddleware } from '../../../../../lib/auth';
+import dbConnect from '../../../../lib/db';
+import { User, Category, Transaction } from '../../../../lib/models';
+import { authMiddleware } from '../../../../lib/auth';
 
 export async function GET(req) {
+  console.log('Received GET request to /api/users/me'); // Log entry
   try {
+    console.log('Running authMiddleware...');
     const authResult = await authMiddleware(req);
     if (authResult.error) {
+      console.log('Auth failed:', authResult.error);
       return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
     }
 
+    console.log('Auth succeeded, user:', authResult.user);
     await dbConnect();
+    console.log('DB connected, fetching user...');
     const user = await User.findById(authResult.user.id).populate('organizations.organization');
     if (!user) {
+      console.log('User not found for ID:', authResult.user.id);
       return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 });
     }
 
-    // Fetch categories and transactions for user's organizations
+    console.log('User found, fetching categories and transactions...');
     const categories = await Category.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
     const transactions = await Transaction.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
 
-    // Derive defaultOrgName from defaultOrgId
     const defaultOrg = user.organizations.find(o => o.organization._id.toString() === user.defaultOrgId.toString());
     const defaultOrgName = defaultOrg ? defaultOrg.organization.name : 'Unknown';
 
-    console.log('User fetched:', user._id);
+    console.log('User fetched:', user._id, 'Categories:', categories.length, 'Transactions:', transactions.length);
     return new Response(JSON.stringify({ 
       user: { 
         _id: user._id, 
@@ -38,7 +43,7 @@ export async function GET(req) {
           name: o.organization.name 
         })), 
         defaultOrgId: user.defaultOrgId,
-        defaultOrgName, // Added derived name
+        defaultOrgName,
         categories: categories.map(c => ({
           _id: c._id,
           name: c.name,

@@ -1,5 +1,7 @@
 // src/lib/auth.js
 import jwt from 'jsonwebtoken';
+import { User } from './models'; // Adjusted to match me/route.js structure
+import dbConnect from './db'; // Same dir, should work
 
 export const authMiddleware = async (req) => {
   const authHeader = req.headers.get('authorization');
@@ -14,12 +16,15 @@ export const authMiddleware = async (req) => {
 
   try {
     const res = await fetch(`https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${googleToken}`);
-    if (!res.ok) throw new Error('Invalid Google token');
+    console.log('Tokeninfo response status:', res.status);
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.log('Tokeninfo error response:', errorData);
+      throw new Error('Invalid Google token');
+    }
     const tokenData = await res.json();
     console.log('Google token verified:', tokenData);
 
-    const User = (await import('../models/usersModel.js')).default;
-    const dbConnect = (await import('../lib/db.js')).default;
     await dbConnect();
     const user = await User.findOne({ email: tokenData.email });
     if (!user) {

@@ -38,7 +38,7 @@ export default function Dashboard() {
   const orgId = searchParams.get('orgId');
   const token = searchParams.get('token');
   const userDataParam = searchParams.get('user');
-  const [userData, setUserData] = useState(null);
+  const [userData, setUserData] = useState(userDataParam ? JSON.parse(decodeURIComponent(userDataParam)) : null);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -49,35 +49,32 @@ export default function Dashboard() {
         return;
       }
 
-      console.log('UserData from URL param:', userDataParam ? JSON.parse(decodeURIComponent(userDataParam)) : null);
+      console.log('UserData from URL param:', userData);
 
-      // Always fetch fresh data on mount
-      let fetchedUserData;
-      try {
-        console.log('Fetching userData from API (mount) ////////////////////////////////////////////////////////////////////');
-        const res = await fetch('/api/users/me', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Failed to fetch user data');
-        const data = await res.json();
-        fetchedUserData = data.user;
-        console.log('Fetched userData from API (mount):', fetchedUserData);
-        // Update URL and state
-        router.push(`/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(fetchedUserData))}`);
-        setUserData(fetchedUserData);
-      } catch (error) {
-        console.error('Fetch error:', error);
-        toast.error('Please log in again');
-        router.push('/');
-        return;
+      if (!userData || !userData._id) {
+        try {
+          const res = await fetch('/api/users/me', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!res.ok) throw new Error('Failed to fetch user data');
+          const data = await res.json();
+          setUserData(data.user);
+          console.log('Fetched userData from API:', data.user);
+          router.push(`/dashboard?orgId=${data.user.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
+        } catch (error) {
+          console.error('Fetch user error:', error);
+          toast.error('Please log in again');
+          router.push('/');
+          return;
+        }
       }
 
-      console.log('Dashboard loaded with:', { userData: fetchedUserData, orgId });
+      console.log('Dashboard loaded with:', { userData, orgId });
 
       if (isInitialMount.current) {
         setSelectedOrgId(orgId);
-        const initialCategories = (fetchedUserData.categories || []).filter(c => c.organization_id.toString() === orgId);
-        const initialTransactions = (fetchedUserData.transactions || []).filter(t => t.organization_id.toString() === orgId);
+        const initialCategories = (userData.categories || []).filter(c => c.organization_id.toString() === orgId);
+        const initialTransactions = (userData.transactions || []).filter(t => t.organization_id.toString() === orgId);
         setCategories(initialCategories);
         setTransactions(initialTransactions);
         console.log('Initial state set:', { categories: initialCategories, transactions: initialTransactions });
@@ -192,7 +189,12 @@ export default function Dashboard() {
     };
 
     loadInitialData();
-  }, [orgId, token, userDataParam, router, setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions, removeTransaction, addCategory, removeCategory, updateCategory, updateTransaction, storeCategories, storeTransactions, selectedCategory]);
+  }, [
+    orgId, token, userData, userDataParam, router, setSelectedOrgId, setCategories, 
+    setTransactions, addTransaction, removeTransactions, removeTransaction, 
+    addCategory, removeCategory, updateCategory, updateTransaction, 
+    storeCategories, storeTransactions, selectedCategory
+  ]);
 
   const handleDragEnd = (result) => {
     const { source, destination } = result;
