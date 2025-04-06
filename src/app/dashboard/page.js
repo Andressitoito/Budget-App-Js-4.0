@@ -39,6 +39,7 @@ export default function Dashboard() {
   const token = searchParams.get('token');
   const userDataParam = searchParams.get('user');
   const [userData, setUserData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true); // Loading state
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -48,14 +49,13 @@ export default function Dashboard() {
         return;
       }
 
-      let fetchedUserData;
       try {
         const res = await fetch('/api/users/me', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (!res.ok) throw new Error('Failed to fetch user data');
         const data = await res.json();
-        fetchedUserData = data.user;
+        const fetchedUserData = data.user;
         const minimalUserData = {
           _id: fetchedUserData._id,
           email: fetchedUserData.email,
@@ -67,22 +67,25 @@ export default function Dashboard() {
         };
         router.push(`/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(minimalUserData))}`);
         setUserData(fetchedUserData);
+
+        if (isInitialMount.current) {
+          setSelectedOrgId(orgId);
+          const initialCategories = (fetchedUserData.categories || []).filter(c => c.organization_id.toString() === orgId);
+          const initialTransactions = (fetchedUserData.transactions || []).filter(t => t.organization_id.toString() === orgId);
+          setCategories(initialCategories);
+          setTransactions(initialTransactions);
+          if (initialCategories.length > 0 && !selectedCategory) {
+            setSelectedCategory(initialCategories[0]);
+          }
+          isInitialMount.current = false;
+        }
       } catch (error) {
+        console.error('Fetch error:', error);
         toast.error('Please log in again');
         router.push('/');
         return;
-      }
-
-      if (isInitialMount.current) {
-        setSelectedOrgId(orgId);
-        const initialCategories = (fetchedUserData.categories || []).filter(c => c.organization_id.toString() === orgId);
-        const initialTransactions = (fetchedUserData.transactions || []).filter(t => t.organization_id.toString() === orgId);
-        setCategories(initialCategories);
-        setTransactions(initialTransactions);
-        if (initialCategories.length > 0 && !selectedCategory) {
-          setSelectedCategory(initialCategories[0]);
-        }
-        isInitialMount.current = false;
+      } finally {
+        setIsLoading(false); // Data loaded
       }
 
       socket.emit('joinOrganization', orgId);
@@ -165,7 +168,6 @@ export default function Dashboard() {
     const reorderedCategories = [...storeCategories];
     const [movedCategory] = reorderedCategories.splice(source.index, 1);
     reorderedCategories.splice(destination.index, 0, movedCategory);
-    console.log('New category order:', reorderedCategories.map(c => ({ _id: c._id, name: c.name })));
     setCategories(reorderedCategories);
 
     try {
@@ -185,6 +187,7 @@ export default function Dashboard() {
         throw new Error(`Failed to save category order: ${errorData.error || response.statusText}`);
       }
     } catch (error) {
+      console.error('Error saving category order:', error);
       toast.error('Failed to save category order');
     }
   };
@@ -209,6 +212,34 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex justify-center">
+        <div className="absolute top-16 left-4 w-64 bg-gray-200 rounded-lg p-4 z-10 animate-pulse" style={{ maxHeight: 'calc(100vh - 5rem)' }}>
+          <div className="h-6 bg-gray-300 rounded mb-2"></div>
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-10 bg-gray-300 rounded mb-2"></div>
+          ))}
+        </div>
+        <div className="w-1/2 p-6 flex flex-col items-center relative mt-16 z-0">
+          <div className="bg-gray-200 p-4 rounded-lg shadow-md mb-6 w-full max-w-md animate-pulse">
+            <div className="h-4 bg-gray-300 rounded w-1/2 mb-2"></div>
+            <div className="h-3 bg-gray-300 rounded w-1/3"></div>
+          </div>
+          <div className="bg-gray-200 shadow-md rounded-lg p-6 w-full max-w-md animate-pulse">
+            <div className="h-6 bg-gray-300 rounded mb-2"></div>
+            <div className="h-4 bg-gray-300 rounded mb-2"></div>
+            <div className="h-4 bg-gray-300 rounded mb-4"></div>
+            <div className="h-8 bg-gray-300 rounded-full w-8 mx-auto"></div>
+          </div>
+          <div className="mt-6 w-full max-w-md animate-pulse">
+            <div className="h-64 bg-gray-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center">
       <CategoryList
@@ -230,6 +261,7 @@ export default function Dashboard() {
             <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-md text-center relative">
               <h3 className="text-2xl font-bold text-blue-700 mb-2">{selectedCategory.name}</h3>
               <p className="text-lg">Base Amount: <span className="font-semibold">${selectedCategory.base_amount}</span></p>
+              <p className="text-lg">Spent: <span className="font-semibold">${selectedCategory.base_amount - selectedCategory.remaining_budget}</span></p>
               <p className="text-lg">
                 Remaining: <span className={`font-semibold ${selectedCategory.remaining_budget < 0 ? 'text-red-500' : 'text-green-500'}`}>
                   ${selectedCategory.remaining_budget}
@@ -271,7 +303,7 @@ export default function Dashboard() {
               <TransactionList
                 transactions={storeTransactions}
                 categoryId={selectedCategory._id}
-                refetchTransactions={() => {}} // Placeholder, socket handles updates
+                refetchTransactions={() => {}}
                 token={token}
                 orgId={orgId}
               />
