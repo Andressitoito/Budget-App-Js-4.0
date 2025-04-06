@@ -7,7 +7,7 @@ import useAppStore from '../../stores/appStore';
 import dynamic from 'next/dynamic';
 import CategoryList from '../../components/category/CategoryList';
 import TransactionList from '../../components/transactions/TransactionList';
-import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig, deleteTransactionConfig } from './configs';
+import { createTransactionConfig, createCategoryConfig, editCategoryConfig, deleteCategoryConfig } from './configs';
 import { AiOutlinePlus, AiOutlineEdit, AiOutlineDelete } from 'react-icons/ai';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-toastify';
@@ -49,21 +49,23 @@ export default function Dashboard() {
         return;
       }
 
-      if (!userData || !userData._id) {
-        try {
-          const res = await fetch('/api/users/me', {
-            headers: { 'Authorization': `Bearer ${token}` },
-          });
-          if (!res.ok) throw new Error('Failed to fetch user data');
-          const data = await res.json();
-          setUserData(data.user);
-          router.push(`/dashboard?orgId=${data.user.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
-        } catch (error) {
-          console.error('Fetch user error:', error);
-          toast.error('Please log in again');
-          router.push('/');
-          return;
-        }
+      console.log('UserData from URL param:', userData);
+
+      // Always fetch fresh userData from API to sync with DB
+      try {
+        const res = await fetch('/api/users/me', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch user data');
+        const data = await res.json();
+        setUserData(data.user);
+        console.log('Fetched userData from API:', data.user);
+        router.push(`/dashboard?orgId=${data.user.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
+      } catch (error) {
+        console.error('Fetch user error:', error);
+        toast.error('Please log in again');
+        router.push('/');
+        return;
       }
 
       console.log('Dashboard loaded with:', { userData, orgId });
@@ -285,10 +287,9 @@ export default function Dashboard() {
               <TransactionList
                 transactions={storeTransactions}
                 categoryId={selectedCategory._id}
-                onDelete={(transaction) => {
-                  setModalConfig(deleteTransactionConfig(transaction, orgId, token));
-                  setIsModalOpen(true);
-                }}
+                refetchTransactions={() => {}} // Placeholder, socket handles updates
+                token={token}
+                orgId={orgId}
               />
             </div>
           </>

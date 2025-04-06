@@ -1,8 +1,15 @@
-import TransactionItem from './TransactionItem';
+// src/components/transactions/TransactionList.js
+'use client';
+
 import InfiniteScroll from 'react-infinite-scroll-component';
 import { useMemo, useState } from 'react';
+import TransactionItem from './TransactionItem';
+import dynamic from 'next/dynamic';
 
-export default function TransactionList({ transactions, categoryId, refetchTransactions }) {
+// Dynamic import for Modal, SSR disabled
+const Modal = dynamic(() => import('../modals/Modal'), { ssr: false });
+
+export default function TransactionList({ transactions, categoryId, refetchTransactions, token, orgId }) {
   const [page, setPage] = useState(1);
   const transactionsPerPage = 10;
 
@@ -20,6 +27,25 @@ export default function TransactionList({ transactions, categoryId, refetchTrans
 
   const hasMoreTransactions = paginatedTransactions.length < filteredTransactions.length;
 
+  const handleDelete = (transaction) => {
+    const deleteConfig = {
+      title: 'Confirm Delete Transaction',
+      fields: [],
+      endpoint: '/api/transactions/delete_transaction',
+      method: 'DELETE',
+      action: 'delete transaction',
+      initialData: { transaction_id: transaction._id, organization_id: orgId },
+      organization_id: orgId,
+      token,
+      submitLabel: 'Delete',
+    };
+    setModalConfig(deleteConfig);
+    setIsModalOpen(true);
+  };
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState(null);
+
   return (
     <div>
       {filteredTransactions.length ? (
@@ -28,20 +54,29 @@ export default function TransactionList({ transactions, categoryId, refetchTrans
           next={() => setPage(prev => prev + 1)}
           hasMore={hasMoreTransactions}
           loader={<h4 className="text-center text-gray-500">Loading...</h4>}
-          // endMessage={<p className="text-center text-gray-500">" "</p>}
         >
           <ul className="space-y-4">
             {paginatedTransactions.map((transaction) => (
               <TransactionItem
                 key={transaction._id}
                 transaction={transaction}
-                refetchTransactions={refetchTransactions}
+                token={token}
+                orgId={orgId}
+                onDelete={handleDelete}
               />
             ))}
           </ul>
         </InfiniteScroll>
       ) : (
         <p className="text-gray-500 text-center">No transactions found.</p>
+      )}
+      {isModalOpen && (
+        <Modal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          config={modalConfig}
+          onSubmit={() => setIsModalOpen(false)}
+        />
       )}
     </div>
   );

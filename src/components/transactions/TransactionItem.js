@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic';
 // Dynamic import for Modal, SSR disabled
 const Modal = dynamic(() => import('../modals/Modal'), { ssr: false });
 
-export default function TransactionItem({ transaction }) {
+export default function TransactionItem({ transaction, token, orgId, onDelete }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
 
@@ -25,8 +25,10 @@ export default function TransactionItem({ transaction }) {
       transaction_id: transaction._id,
       item: transaction.item,
       price: transaction.price,
+      organization_id: orgId,
     },
-    organization_id: transaction.organization_id,
+    organization_id: orgId,
+    token,
     submitLabel: 'Save',
   };
 
@@ -36,8 +38,9 @@ export default function TransactionItem({ transaction }) {
     endpoint: '/api/transactions/delete_transaction',
     method: 'DELETE',
     action: 'delete transaction',
-    initialData: { transaction_id: transaction._id },
-    organization_id: transaction.organization_id,
+    initialData: { transaction_id: transaction._id, organization_id: orgId },
+    organization_id: orgId,
+    token,
     submitLabel: 'Delete',
   };
 
@@ -62,7 +65,7 @@ export default function TransactionItem({ transaction }) {
         </button>
         <button
           className="bg-red-400 text-white p-2 rounded-full hover:bg-red-500"
-          onClick={() => openModal('delete')}
+          onClick={() => onDelete(transaction)}
         >
           <AiOutlineDelete size={16} />
         </button>
@@ -72,7 +75,7 @@ export default function TransactionItem({ transaction }) {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           config={modalConfig}
-          onSubmit={() => setIsModalOpen(false)} // Socket.io in index.js handles updates
+          onSubmit={() => setIsModalOpen(false)}
         />
       )}
     </li>

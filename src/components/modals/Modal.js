@@ -44,12 +44,17 @@ export default function Modal({ isOpen, onClose, config, onSubmit }) {
               <label className="block text-gray-700 mb-1">{field.label}</label>
               <input
                 type={field.type}
-                {...register(field.name, { required: field.type !== 'number' || field.value !== undefined })}
+                {...register(field.name, { 
+                  required: `${field.label} is required`,
+                  validate: value => field.type === 'number' && (value === '' || isNaN(value)) ? `${field.label} must be a valid number` : true
+                })}
                 defaultValue={field.value}
-                className="w-full p-2 border rounded-md"
+                className={`w-full p-2 border rounded-md ${errors[field.name] ? 'border-red-500' : 'border-gray-300'}`}
                 disabled={isLoading}
               />
-              {errors[field.name] && <p className="text-red-500 text-sm">This field is required</p>}
+              {errors[field.name] && (
+                <p className="text-red-500 text-sm mt-1">{errors[field.name].message}</p>
+              )}
             </div>
           ))}
           <div className="flex justify-end space-x-2">
