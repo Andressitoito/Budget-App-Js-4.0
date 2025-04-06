@@ -1,6 +1,6 @@
 // src/app/api/categories/create_category/route.js
 import dbConnect from '../../../../lib/db';
-import { Category } from '../../../../lib/models';
+import { Category, User } from '../../../../lib/models';
 import { authMiddleware } from '../../../../lib/auth';
 
 export async function POST(req) {
@@ -12,8 +12,6 @@ export async function POST(req) {
 
     const { name, base_amount, organization_id } = await req.json();
 
-    console.log('Creating category:', { name, base_amount, organization_id });
-
     if (!name || base_amount === undefined || !organization_id) {
       return new Response(JSON.stringify({ error: 'All fields are required' }), { status: 400 });
     }
@@ -21,15 +19,20 @@ export async function POST(req) {
     await dbConnect();
     const category = new Category({ name, base_amount, remaining_budget: base_amount, organization_id });
     await category.save();
-    console.log('Category created:', category._id);
+
+    // Update user's categoryOrder
+    const user = await User.findById(authResult.user.id);
+    const orderEntry = user.categoryOrder.find(o => o.organizationId.toString() === organization_id);
+    if (orderEntry) {
+      orderEntry.order.push(category._id.toString());
+    } else {
+      user.categoryOrder.push({ organizationId: organization_id, order: [category._id.toString()] });
+    }
+    await user.save();
 
     if (global.io) {
       const categoryData = category.toObject();
-      console.log('Emitting newCategory:', { categoryData, to: organization_id });
       global.io.to(organization_id).emit('newCategory', categoryData);
-      console.log(`Emit sent to organization: ${organization_id}`);
-    } else {
-      console.error('Socket.IO not available');
     }
 
     return new Response(JSON.stringify({ message: 'Category created', category: category.toObject() }), { status: 201 });

@@ -19,10 +19,6 @@ const organizationSchema = new mongoose.Schema({
       ref: 'User',
     },
   ],
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true },
 });
 
 const Organization = mongoose.models.Organization || mongoose.model('Organization', organizationSchema);

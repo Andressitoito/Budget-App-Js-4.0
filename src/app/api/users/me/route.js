@@ -16,8 +16,29 @@ export async function GET(req) {
       return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 });
     }
 
-    const categories = await Category.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
-    const transactions = await Transaction.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
+    const categories = await Category.find({ 
+      organization_id: { $in: user.organizations.map(o => o.organization) }
+    });
+    const transactions = await Transaction.find({ 
+      organization_id: { $in: user.organizations.map(o => o.organization) }
+    });
+
+    // Sort categories by user's categoryOrder per organization
+    const sortedCategories = [];
+    user.organizations.forEach(org => {
+      const orgId = org.organization._id.toString();
+      const orderEntry = user.categoryOrder.find(o => o.organizationId.toString() === orgId);
+      const orgCategories = categories.filter(c => c.organization_id.toString() === orgId);
+      if (orderEntry) {
+        const ordered = orderEntry.order.map(id => orgCategories.find(c => c._id.toString() === id)).filter(Boolean);
+        const unordered = orgCategories.filter(c => !orderEntry.order.includes(c._id.toString()));
+        sortedCategories.push(...ordered, ...unordered);
+      } else {
+        sortedCategories.push(...orgCategories);
+      }
+    });
+
+    console.log('Sorted categories:', sortedCategories.map(c => ({ _id: c._id, name: c.name })));
 
     const defaultOrg = user.organizations.find(o => o.organization._id.toString() === user.defaultOrgId.toString());
     const defaultOrgName = defaultOrg ? defaultOrg.organization.name : 'Unknown';
@@ -36,7 +57,7 @@ export async function GET(req) {
         })), 
         defaultOrgId: user.defaultOrgId,
         defaultOrgName,
-        categories: categories.map(c => ({
+        categories: sortedCategories.map(c => ({
           _id: c._id,
           name: c.name,
           base_amount: c.base_amount,
@@ -50,7 +71,7 @@ export async function GET(req) {
           category_id: t.category_id,
           organization_id: t.organization_id,
           username: t.username,
-          date: t.date // Added date field
+          date: t.date
         }))
       } 
     }), { status: 200 });

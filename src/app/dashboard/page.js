@@ -118,11 +118,10 @@ export default function Dashboard() {
       });
       socket.on('categoryUpdated', (updatedCategory) => {
         if (updatedCategory.organization_id.toString() === orgId) {
-          updateCategory(updatedCategory); // Updates store
+          updateCategory(updatedCategory);
           if (selectedCategory?._id === updatedCategory._id) {
-            setSelectedCategory(updatedCategory); // Updates main display
+            setSelectedCategory(updatedCategory);
           }
-          // Remove redundant setCategories—store already updated
         }
       });
       socket.on('transactionUpdated', (transaction) => {
@@ -160,14 +159,37 @@ export default function Dashboard() {
     loadInitialData();
   }, [orgId, token, userDataParam, router, setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions, removeTransaction, addCategory, removeCategory, updateCategory, updateTransaction, storeCategories, storeTransactions, selectedCategory]);
 
-  const handleDragEnd = (result) => {
+  const handleDragEnd = async (result) => {
     const { source, destination } = result;
     if (!destination || source.index === destination.index) return;
 
     const reorderedCategories = [...storeCategories];
     const [movedCategory] = reorderedCategories.splice(source.index, 1);
     reorderedCategories.splice(destination.index, 0, movedCategory);
+    console.log('New category order:', reorderedCategories.map(c => ({ _id: c._id, name: c.name })));
     setCategories(reorderedCategories);
+
+    try {
+      const response = await fetch('/api/users/update_category_order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ 
+          organization_id: orgId, 
+          categoryOrder: reorderedCategories.map(c => c._id) 
+        }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to save category order: ${errorData.error || response.statusText}`);
+      }
+      console.log('Category order saved successfully');
+    } catch (error) {
+      console.error('Error saving category order:', error);
+      toast.error('Failed to save category order');
+    }
   };
 
   const openCreateModal = () => {
