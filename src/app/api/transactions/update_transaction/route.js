@@ -7,8 +7,6 @@ export async function POST(req) {
     await dbConnect();
     const { transaction_id, item, price, organization_id } = await req.json();
 
-    console.log('Updating transaction:', { transaction_id, item, price, organization_id });
-
     if (!transaction_id || !item || price === undefined) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
     }
@@ -19,18 +17,13 @@ export async function POST(req) {
       { new: true, runValidators: true }
     );
 
-    console.log('Updated transaction:', updatedTransaction);
     if (!updatedTransaction) {
       return new Response(JSON.stringify({ error: 'Transaction not found' }), { status: 404 });
     }
 
     if (global.io) {
       const transactionData = updatedTransaction.toObject();
-      console.log('Emitting transactionUpdated:', { transactionData, to: organization_id });
       global.io.to(organization_id).emit('transactionUpdated', transactionData);
-      console.log(`Emit sent to organization: ${organization_id}`);
-    } else {
-      console.error('Socket.IO not available');
     }
 
     return new Response(JSON.stringify({

@@ -6,21 +6,16 @@ export async function POST(req) {
   try {
     const { username, email, given_name, family_name, picture, organizationId, token, googleToken } = await req.json();
 
-    console.log('Join org request:', { email, organizationId });
-
     if (token !== process.env.AUTH_TOKEN) {
-      console.log('Invalid token:', token);
       return new Response(JSON.stringify({ error: 'Invalid verification token' }), { status: 403 });
     }
 
     await dbConnect();
-    console.log('DB connected');
 
     let user = await User.findOne({ email });
     if (user) {
       const alreadyInOrg = user.organizations.some(org => org.organization.toString() === organizationId);
       if (alreadyInOrg) {
-        console.log('User already in org:', user._id);
         const org = await Organization.findById(organizationId);
         const categories = await Category.find({ organization_id: organizationId });
         const transactions = await Transaction.find({ organization_id: organizationId });
@@ -58,12 +53,10 @@ export async function POST(req) {
     } else {
       user = new User({ username, email, given_name, family_name, picture });
       await user.save();
-      console.log('New user created:', user._id);
     }
 
     const org = await Organization.findById(organizationId);
     if (!org) {
-      console.log('Org not found:', organizationId);
       return new Response(JSON.stringify({ error: 'Organization not found' }), { status: 404 });
     }
 
@@ -71,7 +64,6 @@ export async function POST(req) {
     if (!user.defaultOrgId) user.defaultOrgId = org._id;
     org.members.push(user._id);
     await Promise.all([user.save(), org.save()]);
-    console.log('User and org updated:', user._id, org._id);
 
     const categories = await Category.find({ organization_id: organizationId });
     const transactions = await Transaction.find({ organization_id: organizationId });

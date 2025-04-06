@@ -22,11 +22,10 @@ export default function Modal({ isOpen, onClose, config, onSubmit }) {
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`Failed to ${config.action}`);
-      const responseData = await res.json();
-      console.log(`${config.action} response:`, responseData);
+      await res.json();
       onSubmit();
     } catch (error) {
-      console.error(`Error ${config.action}:`, error);
+      toast.error(`Failed to ${config.action}: ${error.message}`);
     } finally {
       setIsLoading(false);
     }

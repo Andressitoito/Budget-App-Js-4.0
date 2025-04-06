@@ -12,23 +12,16 @@ export async function DELETE(req) {
 
     const { category_id, organization_id } = await req.json();
 
-    console.log('Deleting transactions:', { category_id, organization_id });
-
     if (!category_id || !organization_id) {
       return new Response(JSON.stringify({ error: 'Category ID and Organization ID are required' }), { status: 400 });
     }
 
     await dbConnect();
     const result = await Transaction.deleteMany({ category_id, organization_id });
-    console.log(`Deleted ${result.deletedCount} transactions for category ${category_id} in org ${organization_id}`);
 
     if (global.io) {
       const deleteData = { category_id, deletedCount: result.deletedCount };
-      console.log('Emitting transactionsDeleted:', { deleteData, to: organization_id });
       global.io.to(organization_id).emit('transactionsDeleted', deleteData);
-      console.log(`Emit sent to organization: ${organization_id}`);
-    } else {
-      console.error('Socket.IO not available');
     }
 
     return new Response(JSON.stringify({ message: 'Transactions deleted', deletedCount: result.deletedCount }), { status: 200 });

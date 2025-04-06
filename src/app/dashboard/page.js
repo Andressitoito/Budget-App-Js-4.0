@@ -68,7 +68,6 @@ export default function Dashboard() {
         router.push(`/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(minimalUserData))}`);
         setUserData(fetchedUserData);
       } catch (error) {
-        console.error('Fetch error:', error);
         toast.error('Please log in again');
         router.push('/');
         return;
@@ -185,9 +184,7 @@ export default function Dashboard() {
         const errorData = await response.json();
         throw new Error(`Failed to save category order: ${errorData.error || response.statusText}`);
       }
-      console.log('Category order saved successfully');
     } catch (error) {
-      console.error('Error saving category order:', error);
       toast.error('Failed to save category order');
     }
   };

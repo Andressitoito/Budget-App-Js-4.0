@@ -6,14 +6,10 @@ export async function POST(req) {
   try {
     const { email, given_name, family_name, picture, googleToken } = await req.json();
 
-    console.log('Sign-in request:', { email });
-
     await dbConnect();
-    console.log('DB connected');
 
     let user = await User.findOne({ email }).populate('organizations.organization');
     if (!user) {
-      console.log('User not found:', email);
       return new Response(JSON.stringify({ error: 'User not found, please register' }), { status: 404 });
     }
 
@@ -22,7 +18,6 @@ export async function POST(req) {
     user.picture = picture;
     user.lastLogin = Date.now();
     await user.save();
-    console.log('User updated:', user._id);
 
     const categories = await Category.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
     const transactions = await Transaction.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });

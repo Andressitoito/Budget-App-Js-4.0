@@ -12,8 +12,6 @@ export async function DELETE(req) {
 
     const { category_id, organization_id } = await req.json();
 
-    console.log('Deleting category:', { category_id, organization_id });
-
     if (!category_id || !organization_id) {
       return new Response(JSON.stringify({ error: 'Category ID and Organization ID are required' }), { status: 400 });
     }
@@ -23,15 +21,10 @@ export async function DELETE(req) {
     if (!result) {
       return new Response(JSON.stringify({ error: 'Category not found' }), { status: 404 });
     }
-    console.log(`Deleted category: ${category_id}`);
 
     if (global.io) {
       const deleteData = { category_id };
-      console.log('Emitting categoryDeleted:', { deleteData, to: organization_id });
       global.io.to(organization_id).emit('categoryDeleted', deleteData);
-      console.log(`Emit sent to organization: ${organization_id}`);
-    } else {
-      console.error('Socket.IO not available');
     }
 
     return new Response(JSON.stringify({ message: 'Category deleted' }), { status: 200 });

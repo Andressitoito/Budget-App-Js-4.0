@@ -26,8 +26,6 @@ export default function LandingPage() {
         });
         if (!res.ok) throw new Error(`Google fetch failed: ${res.status}`);
         const userData = await res.json();
-        console.log('Google user data:', userData);
-
         const payload = {
           email: userData.email,
           given_name: userData.given_name,
@@ -37,7 +35,6 @@ export default function LandingPage() {
           ...(isSignIn ? {} : { username, organizationId: joinOrg ? orgId : null, organizationName: joinOrg ? null : orgName, token: verifyToken }),
         };
 
-        console.log('Sending auth request with payload:', payload);
         const endpoint = isSignIn ? '/api/users/signin' : (joinOrg ? '/api/organizations/join_organization' : '/api/organizations/create_new_organization');
         const authRes = await fetch(endpoint, {
           method: 'POST',
@@ -46,18 +43,15 @@ export default function LandingPage() {
         });
 
         const result = await authRes.json();
-        console.log('Auth response:', { status: authRes.status, result });
         if (!authRes.ok) throw new Error(result.error || `Failed to ${isSignIn ? 'sign in' : (joinOrg ? 'join' : 'create')} - Status: ${authRes.status}`);
 
         toast.update(toastId, { render: 'Success!', type: 'success', isLoading: false, autoClose: 2000 });
         router.push(`/dashboard?orgId=${result.orgId || result.defaultOrgId}&token=${tokenResponse.access_token}&user=${encodeURIComponent(JSON.stringify(result.user))}`);
       } catch (error) {
-        console.error('Login error:', error);
         toast.update(toastId, { render: `Login failed: ${error.message}`, type: 'error', isLoading: false, autoClose: 3000 });
       }
     },
     onError: () => {
-      console.error('Google login failed');
       toast.error('Google login failed');
     },
   });

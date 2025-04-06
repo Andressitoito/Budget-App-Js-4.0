@@ -32,8 +32,6 @@ export default function TransactionItem({ transaction, token, orgId, onDelete })
     submitLabel: 'Save',
   };
 
-  console.log(transaction);
-
   const deleteConfig = {
     title: 'Confirm Delete Transaction',
     fields: [],

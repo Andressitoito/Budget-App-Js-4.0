@@ -38,8 +38,6 @@ export async function GET(req) {
       }
     });
 
-    console.log('Sorted categories:', sortedCategories.map(c => ({ _id: c._id, name: c.name })));
-
     const defaultOrg = user.organizations.find(o => o.organization._id.toString() === user.defaultOrgId.toString());
     const defaultOrgName = defaultOrg ? defaultOrg.organization.name : 'Unknown';
 

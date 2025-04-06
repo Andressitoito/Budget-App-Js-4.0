@@ -28,51 +28,35 @@ app.prepare().then(() => {
     });
 
     socket.on('joinOrganization', (orgId) => {
-      console.log(`Client ${socket.id} joining organization: ${orgId}`);
       socket.join(orgId);
-      console.log(`Client ${socket.id} joined rooms:`, Array.from(socket.rooms));
     });
 
     socket.on('newTransaction', (transaction) => {
-      console.log('Received newTransaction:', transaction);
       io.to(transaction.organization_id).emit('newTransaction', transaction);
-      console.log(`Emitted newTransaction to ${transaction.organization_id}, clients in room:`, io.sockets.adapter.rooms.get(transaction.organization_id)?.size || 0);
     });
 
     socket.on('transactionsDeleted', (data) => {
-      console.log('Received transactionsDeleted:', data);
       io.to(data.organization_id).emit('transactionsDeleted', data);
-      console.log(`Emitted transactionsDeleted to ${data.organization_id}, clients in room:`, io.sockets.adapter.rooms.get(data.organization_id)?.size || 0);
     });
 
     socket.on('newCategory', (category) => {
-      console.log('Received newCategory:', category);
       io.to(category.organization_id).emit('newCategory', category);
-      console.log(`Emitted newCategory to ${category.organization_id}, clients in room:`, io.sockets.adapter.rooms.get(category.organization_id)?.size || 0);
     });
 
     socket.on('categoryDeleted', (data) => {
-      console.log('Received categoryDeleted:', data);
       io.to(data.organization_id).emit('categoryDeleted', data);
-      console.log(`Emitted categoryDeleted to ${data.organization_id}, clients in room:`, io.sockets.adapter.rooms.get(data.organization_id)?.size || 0);
     });
 
     socket.on('categoryUpdated', (category) => {
-      console.log('Received categoryUpdated:', category);
       io.to(category.organization_id).emit('categoryUpdated', category);
-      console.log(`Emitted categoryUpdated to ${category.organization_id}, clients in room:`, io.sockets.adapter.rooms.get(category.organization_id)?.size || 0);
     });
 
     socket.on('transactionUpdated', (transaction) => {
-      console.log('Received transactionUpdated:', transaction);
       io.to(transaction.organization_id).emit('transactionUpdated', transaction);
-      console.log(`Emitted transactionUpdated to ${transaction.organization_id}, clients in room:`, io.sockets.adapter.rooms.get(transaction.organization_id)?.size || 0);
     });
 
     socket.on('transactionDeleted', (data) => {
-      console.log('Received transactionDeleted:', data);
       io.to(data.organization_id).emit('transactionDeleted', data);
-      console.log(`Emitted transactionDeleted to ${data.organization_id}, clients in room:`, io.sockets.adapter.rooms.get(data.organization_id)?.size || 0);
     });
 
     socket.on('disconnect', () => {
