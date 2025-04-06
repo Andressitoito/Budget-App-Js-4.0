@@ -2,28 +2,60 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { AiOutlineHome, AiOutlineBarChart, AiOutlineLogout } from 'react-icons/ai';
 import { ToastContainer } from 'react-toastify';
+import { AiOutlineHome, AiOutlineBarChart, AiOutlineBell, AiOutlineLogout } from 'react-icons/ai';
 import 'react-toastify/dist/ReactToastify.css';
 import './globals.css';
 
 export default function RootLayout({ children }) {
-  const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [incomingTransactions, setIncomingTransactions] = useState([]);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (window.location.pathname === '/auth/callback') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const orgId = urlParams.get('orgId');
-      if (orgId) router.push(`/dashboard?orgId=${orgId}`);
+    const token = searchParams.get('token');
+    const userParam = searchParams.get('user');
+    if (token && userParam) {
+      setUserData(JSON.parse(decodeURIComponent(userParam)));
+      // Mock incoming transactions for testing
+      setIncomingTransactions([
+        { _id: 'mock1', name: 'Payment 1', amount: 4000, user_id: 'mock_user', organization_id: 'mock_org' }
+      ]);
     }
-  }, [router]);
+  }, [searchParams]);
 
   const handleLogout = () => {
-    document.cookie = 'token=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict';
     router.push('/');
+    toast.success('Logged out successfully');
+    setUserData(null);
+  };
+
+  const handleDashboardClick = () => {
+    if (pathname === '/dashboard') return;
+    if (!userData) {
+      toast.error('Session invalid, please log in again');
+      router.push('/');
+    } else {
+      const token = searchParams.get('token');
+      router.push(`/dashboard?orgId=${userData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`);
+    }
+  };
+
+  const handleOrganizationsClick = () => {
+    if (!userData) return;
+    const token = searchParams.get('token');
+    router.push(`/organizations?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`);
+  };
+
+  const handleTransactionClick = (transaction) => {
+    const token = searchParams.get('token');
+    router.push(`/dashboard?orgId=${userData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}&transaction=${transaction._id}`);
+    setIsNotifOpen(false);
   };
 
   return (
@@ -33,35 +65,55 @@ export default function RootLayout({ children }) {
           <nav className="bg-blue-600 text-white p-4 fixed w-full top-0 z-20">
             <div className="container mx-auto flex justify-between items-center">
               <span className="text-xl font-bold">Budget App Js 4.0</span>
-              <div className="flex space-x-4">
-                <button
-                  className="flex items-center bg-blue-700 px-3 py-1 rounded-md"
-                  onClick={() => router.push('/dashboard')}
-                >
-                  <AiOutlineHome size={16} className="mr-2" /> Dashboard
-                </button>
-                <button className="flex items-center px-3 py-1 rounded-md opacity-50">
-                  <AiOutlineBarChart size={16} className="mr-2" /> Charts
-                </button>
-                <div className="relative">
+              {userData && (
+                <div className="flex space-x-4">
                   <button
-                    className="flex items-center bg-blue-700 px-3 py-1 rounded-md"
-                    onClick={() => setIsOrgMenuOpen(!isOrgMenuOpen)}
+                    onClick={handleDashboardClick}
+                    className="flex items-center bg-blue-700 px-3 py-1 rounded-md hover:bg-blue-800"
                   >
-                    Organizations
+                    <AiOutlineHome size={16} className="mr-2" /> Dashboard
                   </button>
-                  {isOrgMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded-md shadow-lg">
-                      <button className="block w-full text-left px-4 py-2 hover:bg-gray-200" onClick={() => router.push('/dashboard')}>
-                        View Organizations
-                      </button>
-                      <button className="block w-full text-left px-4 py-2 hover:bg-gray-200" onClick={handleLogout}>
-                        <AiOutlineLogout size={16} className="inline mr-2" /> Logout
-                      </button>
-                    </div>
-                  )}
+                  <button className="flex items-center px-3 py-1 rounded-md opacity-50 cursor-not-allowed">
+                    <AiOutlineBarChart size={16} className="mr-2" /> Charts
+                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsNotifOpen(!isNotifOpen)}
+                      className={`flex items-center bg-blue-700 px-3 py-1 rounded-md hover:bg-blue-800 ${incomingTransactions.length > 0 ? 'animate-pulse' : ''}`}
+                    >
+                      <AiOutlineBell size={16} className="mr-2" /> Buys
+                      {incomingTransactions.length > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                          {incomingTransactions.length}
+                        </span>
+                      )}
+                    </button>
+                    {isNotifOpen && (
+                      <div className="absolute right-0 mt-2 w-64 bg-white text-black rounded-md shadow-lg">
+                        {incomingTransactions.length > 0 ? (
+                          incomingTransactions.map(t => (
+                            <button
+                              key={t._id}
+                              className="block w-full text-left px-4 py-2 hover:bg-gray-200"
+                              onClick={() => handleTransactionClick(t)}
+                            >
+                              {t.name} - ${t.amount}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-2 text-gray-500">No new transactions</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center bg-blue-700 px-3 py-1 rounded-md hover:bg-blue-800"
+                  >
+                    <AiOutlineLogout size={16} className="mr-2" /> Log Out
+                  </button>
                 </div>
-              </div>
+              )}
             </div>
           </nav>
           <main className="pt-16">{children}</main>

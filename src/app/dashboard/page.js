@@ -32,14 +32,18 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState(null);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [transactionSplits, setTransactionSplits] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isInitialMount = useRef(true);
   const router = useRouter();
   const searchParams = useSearchParams();
   const orgId = searchParams.get('orgId');
   const token = searchParams.get('token');
   const userDataParam = searchParams.get('user');
+  const transactionId = searchParams.get('transaction');
   const [userData, setUserData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // Loading state
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -65,7 +69,7 @@ export default function Dashboard() {
           defaultOrgId: fetchedUserData.defaultOrgId,
           defaultOrgName: fetchedUserData.defaultOrgName
         };
-        router.push(`/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(minimalUserData))}`);
+        router.push(`/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(minimalUserData))}${transactionId ? `&transaction=${transactionId}` : ''}`);
         setUserData(fetchedUserData);
 
         if (isInitialMount.current) {
@@ -79,13 +83,18 @@ export default function Dashboard() {
           }
           isInitialMount.current = false;
         }
+
+        if (transactionId === 'mock1') {
+          setTransactionSplits([{ item: 'Payment 1', price: 4000, extra: 0, category_id: '' }]);
+          setIsTransactionModalOpen(true);
+        }
       } catch (error) {
         console.error('Fetch error:', error);
         toast.error('Please log in again');
         router.push('/');
         return;
       } finally {
-        setIsLoading(false); // Data loaded
+        setIsLoading(false);
       }
 
       socket.emit('joinOrganization', orgId);
@@ -159,7 +168,7 @@ export default function Dashboard() {
     };
 
     loadInitialData();
-  }, [orgId, token, userDataParam, router, setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions, removeTransaction, addCategory, removeCategory, updateCategory, updateTransaction, storeCategories, storeTransactions, selectedCategory]);
+  }, [orgId, token, userDataParam, transactionId, router, setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions, removeTransaction, addCategory, removeCategory, updateCategory, updateTransaction, storeCategories, storeTransactions, selectedCategory]);
 
   const handleDragEnd = async (result) => {
     const { source, destination } = result;
@@ -211,6 +220,66 @@ export default function Dashboard() {
     });
     setIsModalOpen(true);
   };
+
+  const addSplit = () => {
+    setTransactionSplits([...transactionSplits, { item: transactionSplits[0].item, price: '', extra: '', category_id: '' }]);
+  };
+
+  const updateSplit = (index, field, value) => {
+    const updatedSplits = [...transactionSplits];
+    updatedSplits[index][field] = value === '' || isNaN(value) ? '' : Number(value);
+    if (index === 0 && field === 'price') {
+      // Keep first split as original, adjust others
+      const remaining = transactionSplits[0].price - value;
+      const otherSplits = updatedSplits.slice(1);
+      const perSplit = otherSplits.length > 0 ? remaining / otherSplits.length : 0;
+      otherSplits.forEach(split => split.price = perSplit >= 0 ? perSplit : 0);
+    }
+    setTransactionSplits(updatedSplits);
+  };
+
+  const handleTransactionSubmit = async () => {
+    setIsSubmitting(true);
+    const totalPrice = transactionSplits.reduce((sum, split) => sum + (split.price || 0), 0);
+    if (totalPrice !== transactionSplits[0].price) {
+      toast.error('Total split prices must equal original transaction amount (excluding extras)');
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      for (const split of transactionSplits) {
+        const response = await fetch('/api/transactions/create_transaction', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            item: split.item,
+            price: (split.price || 0) + (split.extra || 0),
+            category_id: split.category_id,
+            organization_id: orgId,
+            username: userData?.username || userData?.email,
+          }),
+        });
+        if (!response.ok) throw new Error('Failed to create transaction');
+      }
+
+      toast.success('Transactions added successfully');
+      setIsTransactionModalOpen(false);
+      router.push(`/dashboard?orgId=${orgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`);
+    } catch (error) {
+      console.error('Error adding transactions:', error);
+      toast.error('Failed to add transactions');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const remainingAmount = transactionSplits.length > 0 
+    ? transactionSplits[0].price - transactionSplits.slice(1).reduce((sum, split) => sum + (split.price || 0), 0)
+    : 0;
 
   if (isLoading) {
     return (
@@ -320,6 +389,82 @@ export default function Dashboard() {
           config={modalConfig}
           onSubmit={() => setIsModalOpen(false)}
         />
+      )}
+      {isTransactionModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md max-h-[80vh] overflow-y-auto relative">
+            <h2 className="text-xl font-bold mb-4">Manage Incoming Transaction</h2>
+            <div className="absolute top-6 right-6 bg-gray-100 p-2 rounded text-gray-700 text-sm">
+              Remaining: <span className={remainingAmount < 0 ? 'text-red-500' : 'text-green-500'}>${remainingAmount}</span>
+            </div>
+            {transactionSplits.map((split, index) => (
+              <div key={index} className="mb-4">
+                <label className="block text-sm font-medium text-gray-700">Item</label>
+                <input
+                  type="text"
+                  value={split.item}
+                  onChange={(e) => updateSplit(index, 'item', e.target.value)}
+                  className="w-full p-2 border rounded mb-2"
+                />
+                <label className="block text-sm font-medium text-gray-700">Price</label>
+                <input
+                  type="number"
+                  value={split.price}
+                  onChange={(e) => updateSplit(index, 'price', e.target.value)}
+                  className="w-full p-2 border rounded mb-2"
+                  placeholder="0"
+                />
+                <label className="block text-sm font-medium text-gray-700">Extra</label>
+                <input
+                  type="number"
+                  value={split.extra}
+                  onChange={(e) => updateSplit(index, 'extra', e.target.value)}
+                  className="w-full p-2 border rounded mb-2"
+                  placeholder="0"
+                />
+                <label className="block text-sm font-medium text-gray-700">Category</label>
+                <select
+                  value={split.category_id}
+                  onChange={(e) => updateSplit(index, 'category_id', e.target.value)}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select Category</option>
+                  {storeCategories.map(cat => (
+                    <option key={cat._id} value={cat._id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+            <button
+              onClick={addSplit}
+              className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 mb-4"
+            >
+              <AiOutlinePlus size={20} />
+            </button>
+            <div className="flex justify-between">
+              <button
+                onClick={() => setIsTransactionModalOpen(false)}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center"
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTransactionSubmit}
+                className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 flex items-center"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <svg className="animate-spin h-5 w-5 mr-2 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                ) : null}
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
