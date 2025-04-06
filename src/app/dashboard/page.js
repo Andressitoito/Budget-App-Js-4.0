@@ -56,7 +56,6 @@ export default function Dashboard() {
         if (!res.ok) throw new Error('Failed to fetch user data');
         const data = await res.json();
         fetchedUserData = data.user;
-        // Minimal userData for URL
         const minimalUserData = {
           _id: fetchedUserData._id,
           email: fetchedUserData.email,
@@ -119,12 +118,11 @@ export default function Dashboard() {
       });
       socket.on('categoryUpdated', (updatedCategory) => {
         if (updatedCategory.organization_id.toString() === orgId) {
-          updateCategory(updatedCategory);
+          updateCategory(updatedCategory); // Updates store
           if (selectedCategory?._id === updatedCategory._id) {
-            setSelectedCategory(updatedCategory);
+            setSelectedCategory(updatedCategory); // Updates main display
           }
-          const updatedCategories = [...storeCategories];
-          setCategories(updatedCategories);
+          // Remove redundant setCategories—store already updated
         }
       });
       socket.on('transactionUpdated', (transaction) => {
