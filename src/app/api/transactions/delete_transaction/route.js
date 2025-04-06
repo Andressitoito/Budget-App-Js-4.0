@@ -1,6 +1,6 @@
 // src/app/api/transactions/delete_transaction/route.js
 import dbConnect from '../../../../lib/db';
-import { Transaction } from '../../../../lib/models';
+import { Transaction, Category } from '../../../../lib/models';
 import { authMiddleware } from '../../../../lib/auth';
 
 export async function DELETE(req) {
@@ -12,26 +12,29 @@ export async function DELETE(req) {
 
     const { transaction_id, organization_id } = await req.json();
 
-    console.log('Deleting transaction:', { transaction_id, organization_id });
-
     if (!transaction_id || !organization_id) {
       return new Response(JSON.stringify({ error: 'Transaction ID and Organization ID are required' }), { status: 400 });
     }
 
     await dbConnect();
-    const result = await Transaction.findByIdAndDelete(transaction_id);
-    if (!result) {
+    const transaction = await Transaction.findByIdAndDelete(transaction_id);
+    if (!transaction) {
       return new Response(JSON.stringify({ error: 'Transaction not found' }), { status: 404 });
     }
-    console.log(`Deleted transaction: ${transaction_id}`);
+
+    // Update category remaining_budget
+    const category = await Category.findById(transaction.category_id);
+    if (!category) {
+      return new Response(JSON.stringify({ error: 'Category not found' }), { status: 404 });
+    }
+    category.remaining_budget += transaction.price;
+    await category.save();
 
     if (global.io) {
       const deleteData = { transaction_id };
-      console.log('Emitting transactionDeleted:', { deleteData, to: organization_id });
+      const categoryData = category.toObject();
       global.io.to(organization_id).emit('transactionDeleted', deleteData);
-      console.log(`Emit sent to organization: ${organization_id}`);
-    } else {
-      console.error('Socket.IO not available');
+      global.io.to(organization_id).emit('categoryUpdated', categoryData); // Sync budget
     }
 
     return new Response(JSON.stringify({ message: 'Transaction deleted' }), { status: 200 });
