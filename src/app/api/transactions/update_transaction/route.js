@@ -19,6 +19,7 @@ export async function POST(req) {
       { new: true, runValidators: true }
     );
 
+    console.log('Updated transaction:', updatedTransaction);
     if (!updatedTransaction) {
       return new Response(JSON.stringify({ error: 'Transaction not found' }), { status: 404 });
     }

@@ -21,6 +21,7 @@ export async function POST(req) {
     await dbConnect();
     const transaction = new Transaction({ item, price, category_id, organization_id, username });
     await transaction.save();
+    console.log( transaction )
     console.log('Transaction created:', transaction._id);
 
     if (global.io) {

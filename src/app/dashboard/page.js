@@ -43,27 +43,30 @@ export default function Dashboard() {
   useEffect(() => {
     const loadInitialData = async () => {
       if (!token) {
-        console.log('No token, redirecting to /');
         toast.error('Session invalid, please log in again');
         router.push('/');
         return;
       }
 
-      console.log('UserData from URL param:', userDataParam ? JSON.parse(decodeURIComponent(userDataParam)) : null);
-
-      // Always fetch fresh data on mount
       let fetchedUserData;
       try {
-        console.log('Fetching userData from API (mount) ////////////////////////////////////////////////////////////////////');
         const res = await fetch('/api/users/me', {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (!res.ok) throw new Error('Failed to fetch user data');
         const data = await res.json();
         fetchedUserData = data.user;
-        console.log('Fetched userData from API (mount):', fetchedUserData);
-        // Update URL and state
-        router.push(`/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(fetchedUserData))}`);
+        // Minimal userData for URL
+        const minimalUserData = {
+          _id: fetchedUserData._id,
+          email: fetchedUserData.email,
+          given_name: fetchedUserData.given_name,
+          family_name: fetchedUserData.family_name,
+          username: fetchedUserData.username,
+          defaultOrgId: fetchedUserData.defaultOrgId,
+          defaultOrgName: fetchedUserData.defaultOrgName
+        };
+        router.push(`/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(minimalUserData))}`);
         setUserData(fetchedUserData);
       } catch (error) {
         console.error('Fetch error:', error);
@@ -72,74 +75,49 @@ export default function Dashboard() {
         return;
       }
 
-      console.log('Dashboard loaded with:', { userData: fetchedUserData, orgId });
-
       if (isInitialMount.current) {
         setSelectedOrgId(orgId);
         const initialCategories = (fetchedUserData.categories || []).filter(c => c.organization_id.toString() === orgId);
         const initialTransactions = (fetchedUserData.transactions || []).filter(t => t.organization_id.toString() === orgId);
         setCategories(initialCategories);
         setTransactions(initialTransactions);
-        console.log('Initial state set:', { categories: initialCategories, transactions: initialTransactions });
         if (initialCategories.length > 0 && !selectedCategory) {
           setSelectedCategory(initialCategories[0]);
         }
         isInitialMount.current = false;
       }
 
-      console.log('Emitting joinOrganization:', orgId);
       socket.emit('joinOrganization', orgId);
 
-      socket.on('connect', () => {
-        console.log('Connected to Socket.io, socket.id:', socket.id);
-        console.log('Socket rooms on connect:', Array.from(socket.rooms));
-      });
-
+      socket.on('connect', () => {});
       socket.on('newTransaction', (transaction) => {
-        console.log('Received newTransaction:', transaction);
         if (transaction.organization_id.toString() === orgId) {
           addTransaction(transaction);
           const updatedTransactions = [...storeTransactions.filter(t => t._id !== transaction._id), transaction];
           setTransactions(updatedTransactions);
-          console.log('Zustand transactions updated:', updatedTransactions);
-        } else {
-          console.log('Transaction ignored - wrong orgId:', transaction.organization_id, 'expected:', orgId);
         }
       });
-
       socket.on('transactionsDeleted', ({ category_id, deletedCount }) => {
-        console.log(`Received transactionsDeleted: category_id=${category_id}, deletedCount=${deletedCount}`);
         removeTransactions(category_id);
         const newTransactions = storeTransactions.filter(t => t.category_id !== category_id);
         setTransactions(newTransactions);
-        console.log('Zustand transactions updated after delete:', newTransactions);
       });
-
       socket.on('newCategory', (category) => {
-        console.log('Received newCategory:', category);
         if (category.organization_id.toString() === orgId) {
           addCategory(category);
           const updatedCategories = [...storeCategories.filter(c => c._id !== category._id), category];
           setCategories(updatedCategories);
           if (!selectedCategory) setSelectedCategory(category);
-          console.log('Zustand categories updated:', updatedCategories);
-        } else {
-          console.log('Category ignored - wrong orgId:', category.organization_id);
         }
       });
-
       socket.on('categoryDeleted', ({ category_id }) => {
-        console.log(`Received categoryDeleted: category_id=${category_id}`);
         removeCategory(category_id);
         removeTransactions(category_id);
         const newCategories = storeCategories.filter(c => c._id !== category_id);
         setCategories(newCategories);
         setSelectedCategory(newCategories[0] || null);
-        console.log('Zustand categories updated after delete:', newCategories);
       });
-
       socket.on('categoryUpdated', (updatedCategory) => {
-        console.log('Received categoryUpdated:', updatedCategory);
         if (updatedCategory.organization_id.toString() === orgId) {
           updateCategory(updatedCategory);
           if (selectedCategory?._id === updatedCategory._id) {
@@ -147,32 +125,22 @@ export default function Dashboard() {
           }
           const updatedCategories = [...storeCategories];
           setCategories(updatedCategories);
-          console.log('Zustand categories updated:', updatedCategories);
         }
       });
-
       socket.on('transactionUpdated', (transaction) => {
-        console.log('Received transactionUpdated:', transaction);
         if (transaction.organization_id.toString() === orgId) {
           updateTransaction(transaction);
           const updatedTransactions = storeTransactions.map(t => 
             t._id === transaction._id ? transaction : t
           );
           setTransactions([...updatedTransactions]);
-          console.log('Zustand transactions updated:', updatedTransactions);
-        } else {
-          console.log('Transaction update ignored - wrong orgId:', transaction.organization_id);
         }
       });
-
       socket.on('transactionDeleted', ({ transaction_id }) => {
-        console.log(`Received transactionDeleted: transaction_id=${transaction_id}`);
         removeTransaction(transaction_id);
         const newTransactions = storeTransactions.filter(t => t._id !== transaction_id);
         setTransactions(newTransactions);
-        console.log('Zustand transactions updated after delete:', newTransactions);
       });
-
       socket.on('connect_error', (err) => {
         console.error('Socket connection error:', err);
         toast.error('Lost connection to server, retrying...');
