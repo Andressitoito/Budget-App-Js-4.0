@@ -10,6 +10,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import './globals.css';
 
 export default function RootLayout({ children }) {
+  const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [userData, setUserData] = useState(null);
   const [incomingTransactions, setIncomingTransactions] = useState([]);
@@ -17,12 +18,23 @@ export default function RootLayout({ children }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Pass this to children via context or props if needed
+  const handleOpenTransactionModal = (transactionId) => {
+    // To be handled by page.js
+    if (pathname === '/dashboard') {
+      window.dispatchEvent(new CustomEvent('openTransactionModal', { detail: transactionId }));
+    } else {
+      const token = searchParams.get('token');
+      router.push(`/dashboard?orgId=${userData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}&transaction=${transactionId}`);
+    }
+    setIsNotifOpen(false);
+  };
+
   useEffect(() => {
     const token = searchParams.get('token');
     const userParam = searchParams.get('user');
     if (token && userParam) {
       setUserData(JSON.parse(decodeURIComponent(userParam)));
-      // Mock incoming transactions for testing
       setIncomingTransactions([
         { _id: 'mock1', name: 'Payment 1', amount: 4000, user_id: 'mock_user', organization_id: 'mock_org' }
       ]);
@@ -52,12 +64,6 @@ export default function RootLayout({ children }) {
     router.push(`/organizations?token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`);
   };
 
-  const handleTransactionClick = (transaction) => {
-    const token = searchParams.get('token');
-    router.push(`/dashboard?orgId=${userData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}&transaction=${transaction._id}`);
-    setIsNotifOpen(false);
-  };
-
   return (
     <html lang="en" className="bg-gray-100">
       <body>
@@ -66,7 +72,7 @@ export default function RootLayout({ children }) {
             <div className="container mx-auto flex justify-between items-center">
               <span className="text-xl font-bold">Budget App Js 4.0</span>
               {userData && (
-                <div className="flex space-x-4">
+                <div className="flex space-x-4 items-center">
                   <button
                     onClick={handleDashboardClick}
                     className="flex items-center bg-blue-700 px-3 py-1 rounded-md hover:bg-blue-800"
@@ -95,7 +101,7 @@ export default function RootLayout({ children }) {
                             <button
                               key={t._id}
                               className="block w-full text-left px-4 py-2 hover:bg-gray-200"
-                              onClick={() => handleTransactionClick(t)}
+                              onClick={() => handleOpenTransactionModal(t._id)}
                             >
                               {t.name} - ${t.amount}
                             </button>

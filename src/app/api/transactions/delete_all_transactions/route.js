@@ -1,6 +1,6 @@
 // src/app/api/transactions/delete_all_transactions/route.js
 import dbConnect from '../../../../lib/db';
-import { Transaction } from '../../../../lib/models';
+import { Transaction, Category } from '../../../../lib/models';
 import { authMiddleware } from '../../../../lib/auth';
 
 export async function DELETE(req) {
@@ -17,16 +17,24 @@ export async function DELETE(req) {
     }
 
     await dbConnect();
-    const result = await Transaction.deleteMany({ category_id, organization_id });
-
-    if (global.io) {
-      const deleteData = { category_id, deletedCount: result.deletedCount };
-      global.io.to(organization_id).emit('transactionsDeleted', deleteData);
+    const deleted = await Transaction.deleteMany({ category_id, organization_id });
+    
+    const category = await Category.findById(category_id);
+    if (category) {
+      category.remaining_budget = category.base_amount; // Reset to base_amount
+      await category.save();
     }
 
-    return new Response(JSON.stringify({ message: 'Transactions deleted', deletedCount: result.deletedCount }), { status: 200 });
+    if (global.io) {
+      global.io.to(organization_id).emit('transactionsDeleted', { category_id, deletedCount: deleted.deletedCount });
+      if (category) {
+        global.io.to(organization_id).emit('categoryUpdated', category.toObject());
+      }
+    }
+
+    return new Response(JSON.stringify({ message: 'Transactions deleted', deletedCount: deleted.deletedCount }), { status: 200 });
   } catch (error) {
-    console.error('Delete transactions error:', error.stack);
+    console.error('Delete all transactions error:', error.stack);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 }
