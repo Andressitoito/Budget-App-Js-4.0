@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import { AiOutlineHome, AiOutlineBarChart, AiOutlineBell, AiOutlineLogout } from 'react-icons/ai';
 import 'react-toastify/dist/ReactToastify.css';
 import './globals.css';
@@ -18,14 +18,12 @@ export default function RootLayout({ children }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Pass this to children via context or props if needed
   const handleOpenTransactionModal = (transactionId) => {
-    // To be handled by page.js
     if (pathname === '/dashboard') {
       window.dispatchEvent(new CustomEvent('openTransactionModal', { detail: transactionId }));
     } else {
       const token = searchParams.get('token');
-      router.push(`/dashboard?orgId=${userData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}&transaction=${transactionId}`);
+      router.push(`/dashboard?orgId=${userData?.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}&transaction=${transactionId}`);
     }
     setIsNotifOpen(false);
   };
@@ -33,18 +31,47 @@ export default function RootLayout({ children }) {
   useEffect(() => {
     const token = searchParams.get('token');
     const userParam = searchParams.get('user');
-    if (token && userParam) {
+    const code = searchParams.get('code');
+
+    if (code) {
+      fetch('/api/users/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, redirectUri: 'http://localhost:3000/dashboard' }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.token && data.user) {
+            setUserData(data.user);
+            setIncomingTransactions([
+              { _id: 'mock1', name: 'Payment 1', amount: 4000, user_id: 'mock_user', organization_id: 'mock_org' }
+            ]);
+            router.replace(`/dashboard?orgId=${data.user.defaultOrgId}&token=${data.token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
+          } else {
+            throw new Error('Login failed');
+          }
+        })
+        .catch(error => {
+          console.error('Login error:', error);
+          toast.error('Login failed, try again');
+          router.push('/');
+        });
+    } else if (token && userParam) {
       setUserData(JSON.parse(decodeURIComponent(userParam)));
       setIncomingTransactions([
         { _id: 'mock1', name: 'Payment 1', amount: 4000, user_id: 'mock_user', organization_id: 'mock_org' }
       ]);
+    } else if (pathname !== '/' && !userData) {
+      // Redirect to login if no user data on protected routes
+      router.push('/');
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handleLogout = () => {
-    router.push('/');
+    setUserData(null); // Clear userData first
+    setIncomingTransactions([]); // Clear transactions
+    router.replace('/'); // Use replace to avoid back-button issues
     toast.success('Logged out successfully');
-    setUserData(null);
   };
 
   const handleDashboardClick = () => {
@@ -71,7 +98,7 @@ export default function RootLayout({ children }) {
           <nav className="bg-blue-600 text-white p-4 fixed w-full top-0 z-20">
             <div className="container mx-auto flex justify-between items-center">
               <span className="text-xl font-bold">Budget App Js 4.0</span>
-              {userData && (
+              {userData ? (
                 <div className="flex space-x-4 items-center">
                   <button
                     onClick={handleDashboardClick}
@@ -119,7 +146,7 @@ export default function RootLayout({ children }) {
                     <AiOutlineLogout size={16} className="mr-2" /> Log Out
                   </button>
                 </div>
-              )}
+              ) : null} {/* Changed "" to null for clarity */}
             </div>
           </nav>
           <main className="pt-16">{children}</main>

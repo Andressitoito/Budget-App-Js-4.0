@@ -11,7 +11,7 @@ export async function GET(req) {
     }
 
     await dbConnect();
-    const user = await User.findById(authResult.user.id).populate('organizations.organization');
+    const user = await User.findById(authResult.userId).populate('organizations.organization');
     if (!user) {
       return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 });
     }

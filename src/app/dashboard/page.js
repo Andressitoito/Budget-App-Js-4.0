@@ -48,9 +48,12 @@ export default function Dashboard() {
     console.log('Dashboard - storeCategories:', storeCategories, 'storeTransactions:', storeTransactions, 'selectedCategory:', selectedCategory);
 
     const loadInitialData = async () => {
-      if (!token) {
-        toast.error('Session invalid, please log in again');
-        router.push('/');
+      if (!token || !userDataParam) {
+        if (!isInitialMount.current) {
+          toast.error('Session invalid, please log in again');
+          router.push('/');
+        }
+        setIsLoading(false);
         return;
       }
 
@@ -70,7 +73,10 @@ export default function Dashboard() {
           defaultOrgId: fetchedUserData.defaultOrgId,
           defaultOrgName: fetchedUserData.defaultOrgName
         };
-        router.push(`/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(minimalUserData))}${transactionId ? `&transaction=${transactionId}` : ''}`);
+        const newPath = `/dashboard?orgId=${fetchedUserData.defaultOrgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(minimalUserData))}${transactionId ? `&transaction=${transactionId}` : ''}`;
+        if (window.location.pathname + window.location.search !== newPath) {
+          router.replace(newPath);
+        }
         setUserData(fetchedUserData);
 
         if (isInitialMount.current) {
@@ -96,10 +102,21 @@ export default function Dashboard() {
         toast.error('Please log in again');
         router.push('/');
         return;
-      } finally {
-        setIsLoading(false);
       }
+    };
 
+    loadInitialData();
+  }, [orgId, token, userDataParam, router, setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions, removeTransaction, addCategory, removeCategory, updateCategory, updateTransaction, storeCategories, storeTransactions, selectedCategory]);
+
+  useEffect(() => {
+    // Turn off loading only when userData is fully set
+    if (userData && userData.defaultOrgName && userData.defaultOrgName !== 'Unknown') {
+      setIsLoading(false);
+    }
+  }, [userData]);
+
+  useEffect(() => {
+    if (!isLoading && userData) {
       socket.emit('joinOrganization', orgId);
 
       socket.on('connect', () => {});
@@ -184,10 +201,8 @@ export default function Dashboard() {
         socket.off('connect_error');
         window.removeEventListener('openTransactionModal', handleOpenTransactionModal);
       };
-    };
-
-    loadInitialData();
-  }, [orgId, token, userDataParam, router, setSelectedOrgId, setCategories, setTransactions, addTransaction, removeTransactions, removeTransaction, addCategory, removeCategory, updateCategory, updateTransaction, storeCategories, storeTransactions, selectedCategory]);
+    }
+  }, [isLoading, userData, orgId, token, storeCategories, storeTransactions, selectedCategory, addTransaction, removeTransactions, removeTransaction, addCategory, removeCategory, updateCategory, updateTransaction, setCategories, setTransactions, setSelectedOrgId]);
 
   const handleDragEnd = async (result) => {
     const { source, destination } = result;
@@ -245,12 +260,29 @@ export default function Dashboard() {
     setIsModalOpen(true);
   };
 
-  const handleTransactionModalClose = () => {
+  const handleTransactionModalClose = async () => {
     setIsTransactionModalOpen(false);
     router.replace(`/dashboard?orgId=${orgId}&token=${token}&user=${encodeURIComponent(JSON.stringify(userData))}`);
+    
+    try {
+      const res = await fetch('/api/users/me', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to refetch user data');
+      const data = await res.json();
+      const fetchedUserData = data.user;
+      const updatedCategories = (fetchedUserData.categories || []).filter(c => c.organization_id.toString() === orgId);
+      const updatedTransactions = (fetchedUserData.transactions || []).filter(t => t.organization_id.toString() === orgId);
+      setCategories(updatedCategories);
+      setTransactions(updatedTransactions);
+      console.log('Refetched - storeCategories:', updatedCategories, 'storeTransactions:', updatedTransactions);
+    } catch (error) {
+      console.error('Refetch error:', error);
+      toast.error('Failed to sync data after transaction');
+    }
   };
 
-  if (isLoading) {
+  if (isLoading || !userData || userData.defaultOrgName === 'Unknown') {
     return (
       <div className="min-h-screen bg-gray-100 flex justify-center">
         <div className="absolute top-16 left-4 w-64 bg-gray-200 rounded-lg p-4 z-10 animate-pulse" style={{ maxHeight: 'calc(100vh - 5rem)' }}>

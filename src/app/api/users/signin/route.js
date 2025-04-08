@@ -1,66 +1,102 @@
 // src/app/api/users/signin/route.js
 import dbConnect from '../../../../lib/db';
-import { User, Category, Transaction } from '../../../../lib/models';
+import { User, Organization } from '../../../../lib/models';
+import { getGoogleUserInfo } from '../../../../lib/google-auth';
+import jwt from 'jsonwebtoken';
 
 export async function POST(req) {
   try {
-    const { email, given_name, family_name, picture, googleToken } = await req.json();
+    const { code, redirectUri, username, organizationId, organizationName, token: verifyToken } = await req.json();
+    if (!code || !redirectUri) {
+      return new Response(JSON.stringify({ error: 'Missing code or redirect_uri' }), { status: 400 });
+    }
+
+    const userInfo = await getGoogleUserInfo(code, redirectUri);
+    if (!userInfo.email) {
+      return new Response(JSON.stringify({ error: 'Failed to fetch user info from Google' }), { status: 400 });
+    }
 
     await dbConnect();
 
-    let user = await User.findOne({ email }).populate('organizations.organization');
+    let user = await User.findOne({ email: userInfo.email });
+    const now = new Date();
+
     if (!user) {
-      return new Response(JSON.stringify({ error: 'User not found, please register' }), { status: 404 });
+      if (organizationId) {
+        // Join organization
+        const org = await Organization.findById(organizationId);
+        if (!org) {
+          return new Response(JSON.stringify({ error: 'Organization not found' }), { status: 404 });
+        }
+        // Add verifyToken check if implemented later
+        user = new User({
+          username: username || userInfo.email.split('@')[0],
+          email: userInfo.email,
+          given_name: userInfo.given_name,
+          family_name: userInfo.family_name,
+          picture: userInfo.picture,
+          defaultOrgId: organizationId,
+          defaultOrgName: org.name,
+          organizations: [{
+            organization: organizationId,
+            role: 'member',
+            name: org.name,
+            joinedAt: now
+          }],
+          lastLogin: now,
+          createdAt: now,
+          updatedAt: now
+        });
+      } else {
+        // Create new organization
+        const organization = new Organization({
+          name: organizationName || `${userInfo.given_name}'s Organization`,
+        });
+        await organization.save();
+
+        user = new User({
+          username: username || userInfo.email.split('@')[0],
+          email: userInfo.email,
+          given_name: userInfo.given_name,
+          family_name: userInfo.family_name,
+          picture: userInfo.picture,
+          defaultOrgId: organization._id.toString(),
+          defaultOrgName: organization.name,
+          organizations: [{
+            organization: organization._id,
+            role: 'owner',
+            name: organization.name,
+            joinedAt: now
+          }],
+          lastLogin: now,
+          createdAt: now,
+          updatedAt: now
+        });
+      }
+      await user.save();
+    } else {
+      user.lastLogin = now;
+      user.updatedAt = now;
+      await user.save();
     }
 
-    user.given_name = given_name;
-    user.family_name = family_name;
-    user.picture = picture;
-    user.lastLogin = Date.now();
-    await user.save();
+    const token = jwt.sign(
+      { userId: user._id.toString(), email: user.email },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '1h' }
+    );
 
-    const categories = await Category.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
-    const transactions = await Transaction.find({ organization_id: { $in: user.organizations.map(o => o.organization) } });
+    const minimalUserData = {
+      _id: user._id.toString(),
+      email: user.email,
+      given_name: user.given_name,
+      family_name: user.family_name,
+      username: user.username,
+      defaultOrgId: user.defaultOrgId,
+      defaultOrgName: user.defaultOrgName
+    };
 
-    // Derive defaultOrgName from defaultOrgId
-    const defaultOrg = user.organizations.find(o => o.organization._id.toString() === user.defaultOrgId.toString());
-    const defaultOrgName = defaultOrg ? defaultOrg.organization.name : 'Unknown';
-
-    return new Response(JSON.stringify({ 
-      message: 'Signed in', 
-      userId: user._id, 
-      defaultOrgId: user.defaultOrgId, 
-      token: googleToken, 
-      user: { 
-        _id: user._id, 
-        email: user.email, 
-        given_name: user.given_name, 
-        family_name: user.family_name, 
-        username: user.username || user.email, 
-        organizations: user.organizations.map(o => ({ 
-          organization: o.organization._id, 
-          role: o.role, 
-          name: o.organization.name // Populate name
-        })), 
-        defaultOrgId: user.defaultOrgId,
-        defaultOrgName, // Add derived name
-        categories: categories.map(c => ({
-          _id: c._id,
-          name: c.name,
-          base_amount: c.base_amount,
-          remaining_budget: c.remaining_budget,
-          organization_id: c.organization_id
-        })),
-        transactions: transactions.map(t => ({
-          _id: t._id,
-          item: t.item,
-          price: t.price,
-          category_id: t.category_id,
-          organization_id: t.organization_id,
-          username: t.username
-        }))
-      } 
-    }), { status: 200 });
+    return new Response(JSON.stringify({ token, user: minimalUserData }), { status: 200 });
   } catch (error) {
     console.error('Sign-in error:', error.stack);
     return new Response(JSON.stringify({ error: error.message }), { status: 500 });

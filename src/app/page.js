@@ -1,9 +1,8 @@
 // src/app/page.js
 'use client';
 
-import { useState } from 'react';
-import { useGoogleLogin } from '@react-oauth/google';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-toastify';
 
 export default function LandingPage() {
@@ -13,48 +12,71 @@ export default function LandingPage() {
   const [orgName, setOrgName] = useState('');
   const [username, setUsername] = useState('');
   const [verifyToken, setVerifyToken] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const login = useGoogleLogin({
-    flow: 'implicit',
-    redirect_uri: 'http://localhost:3000/auth/callback',
-    onSuccess: async (tokenResponse) => {
+  const handleLogin = () => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const redirectUri = `http://localhost:3000${isSignIn ? '/dashboard' : '/organizations'}`;
+    const scope = 'email profile';
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(JSON.stringify({ isSignIn, username, joinOrg, orgId, orgName, verifyToken }))}`;
+    window.location.href = authUrl;
+  };
+
+  useEffect(() => {
+    const code = searchParams.get('code');
+    const state = searchParams.get('state');
+    const token = searchParams.get('token');
+    const userParam = searchParams.get('user');
+
+    if (code && state) {
+      setIsLoading(true);
+      const { isSignIn, username, joinOrg, orgId, orgName, verifyToken } = JSON.parse(decodeURIComponent(state));
       const toastId = toast.loading(isSignIn ? 'Logging in...' : 'Creating organization...');
-      try {
-        const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        if (!res.ok) throw new Error(`Google fetch failed: ${res.status}`);
-        const userData = await res.json();
-        const payload = {
-          email: userData.email,
-          given_name: userData.given_name,
-          family_name: userData.family_name,
-          picture: userData.picture,
-          googleToken: tokenResponse.access_token,
+      fetch('/api/users/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          redirectUri: `http://localhost:3000${isSignIn ? '/dashboard' : '/organizations'}`,
           ...(isSignIn ? {} : { username, organizationId: joinOrg ? orgId : null, organizationName: joinOrg ? null : orgName, token: verifyToken }),
-        };
+        }),
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.token && data.user) {
+            const path = isSignIn ? '/dashboard' : '/organizations';
+            router.replace(`${path}?orgId=${data.user.defaultOrgId}&token=${data.token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
+            toast.update(toastId, { render: 'Success!', type: 'success', isLoading: false, autoClose: 2000 });
+          } else {
+            throw new Error('Login failed');
+          }
+        })
+        .catch(error => {
+          console.error('Login error:', error);
+          toast.update(toastId, { render: `Login failed: ${error.message}`, type: 'error', isLoading: false, autoClose: 3000 });
+          router.push('/');
+        })
+        .finally(() => setIsLoading(false));
+    } else if (token && userParam) {
+      router.push(`/dashboard?orgId=${JSON.parse(decodeURIComponent(userParam)).defaultOrgId}&token=${token}&user=${userParam}`);
+    }
+  }, [searchParams, router]);
 
-        const endpoint = isSignIn ? '/api/users/signin' : (joinOrg ? '/api/organizations/join_organization' : '/api/organizations/create_new_organization');
-        const authRes = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        const result = await authRes.json();
-        if (!authRes.ok) throw new Error(result.error || `Failed to ${isSignIn ? 'sign in' : (joinOrg ? 'join' : 'create')} - Status: ${authRes.status}`);
-
-        toast.update(toastId, { render: 'Success!', type: 'success', isLoading: false, autoClose: 2000 });
-        router.push(`/dashboard?orgId=${result.orgId || result.defaultOrgId}&token=${tokenResponse.access_token}&user=${encodeURIComponent(JSON.stringify(result.user))}`);
-      } catch (error) {
-        toast.update(toastId, { render: `Login failed: ${error.message}`, type: 'error', isLoading: false, autoClose: 3000 });
-      }
-    },
-    onError: () => {
-      toast.error('Google login failed');
-    },
-  });
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md text-center">
+          <svg className="animate-spin h-10 w-10 mx-auto text-blue-600" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
@@ -62,7 +84,7 @@ export default function LandingPage() {
       <p className="text-lg text-gray-700 mb-8 text-center max-w-md">
         Take control of your finances with Budget App Js 4.0—collaborate, track, and optimize your budget effortlessly.
       </p>
-      <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+      <div className="bg-white p-6 roundedidae-lg shadow-md w-full max-w-md">
         <div className="mb-4 flex justify-center space-x-4">
           <button
             className={`px-4 py-2 rounded-md ${isSignIn ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
@@ -79,7 +101,7 @@ export default function LandingPage() {
         </div>
         {isSignIn ? (
           <button
-            onClick={() => login()}
+            onClick={handleLogin}
             className="mt-6 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 flex items-center justify-center"
           >
             <span className="mr-2">Sign In with Google</span>
@@ -146,7 +168,7 @@ export default function LandingPage() {
               </div>
             )}
             <button
-              onClick={() => login()}
+              onClick={handleLogin}
               className="mt-6 w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 flex items-center justify-center"
             >
               <span className="mr-2">Register with Google</span>
