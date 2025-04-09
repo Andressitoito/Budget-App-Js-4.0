@@ -3,6 +3,8 @@ export async function getGoogleUserInfo(code, redirectUri) {
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
+  console.log('Exchanging code:', { code, redirectUri, clientId }); // Debug
+
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -16,7 +18,8 @@ export async function getGoogleUserInfo(code, redirectUri) {
   });
 
   if (!tokenResponse.ok) {
-    throw new Error('Failed to exchange code for token');
+    const errorText = await tokenResponse.text();
+    throw new Error(`Failed to exchange code for token: ${errorText}`);
   }
 
   const tokenData = await tokenResponse.json();

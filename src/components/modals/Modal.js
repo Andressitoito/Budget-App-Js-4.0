@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { toast } from 'react-toastify';
 
 export default function Modal({ isOpen, onClose, config, onSubmit }) {
   const [isLoading, setIsLoading] = useState(false);

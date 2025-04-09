@@ -21,7 +21,7 @@ export async function POST(req) {
     await category.save();
 
     // Update user's categoryOrder
-    const user = await User.findById(authResult.user.id);
+    const user = await User.findById(authResult.userId);
     const orderEntry = user.categoryOrder.find(o => o.organizationId.toString() === organization_id);
     if (orderEntry) {
       orderEntry.order.push(category._id.toString());

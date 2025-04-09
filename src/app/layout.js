@@ -31,46 +31,21 @@ export default function RootLayout({ children }) {
   useEffect(() => {
     const token = searchParams.get('token');
     const userParam = searchParams.get('user');
-    const code = searchParams.get('code');
 
-    if (code) {
-      fetch('/api/users/signin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, redirectUri: 'http://localhost:3000/dashboard' }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.token && data.user) {
-            setUserData(data.user);
-            setIncomingTransactions([
-              { _id: 'mock1', name: 'Payment 1', amount: 4000, user_id: 'mock_user', organization_id: 'mock_org' }
-            ]);
-            router.replace(`/dashboard?orgId=${data.user.defaultOrgId}&token=${data.token}&user=${encodeURIComponent(JSON.stringify(data.user))}`);
-          } else {
-            throw new Error('Login failed');
-          }
-        })
-        .catch(error => {
-          console.error('Login error:', error);
-          toast.error('Login failed, try again');
-          router.push('/');
-        });
-    } else if (token && userParam) {
+    if (token && userParam) {
       setUserData(JSON.parse(decodeURIComponent(userParam)));
       setIncomingTransactions([
         { _id: 'mock1', name: 'Payment 1', amount: 4000, user_id: 'mock_user', organization_id: 'mock_org' }
       ]);
     } else if (pathname !== '/' && !userData) {
-      // Redirect to login if no user data on protected routes
       router.push('/');
     }
   }, [searchParams, router]);
 
   const handleLogout = () => {
-    setUserData(null); // Clear userData first
-    setIncomingTransactions([]); // Clear transactions
-    router.replace('/'); // Use replace to avoid back-button issues
+    setUserData(null);
+    setIncomingTransactions([]);
+    router.replace('/');
     toast.success('Logged out successfully');
   };
 
@@ -146,7 +121,7 @@ export default function RootLayout({ children }) {
                     <AiOutlineLogout size={16} className="mr-2" /> Log Out
                   </button>
                 </div>
-              ) : null} {/* Changed "" to null for clarity */}
+              ) : null}
             </div>
           </nav>
           <main className="pt-16">{children}</main>

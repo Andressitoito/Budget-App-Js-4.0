@@ -6,11 +6,13 @@ import jwt from 'jsonwebtoken';
 
 export async function POST(req) {
   try {
-    const { code, redirectUri, username, organizationId, organizationName, token: verifyToken } = await req.json();
-    if (!code || !redirectUri) {
-      return new Response(JSON.stringify({ error: 'Missing code or redirect_uri' }), { status: 400 });
+    const { code, redirectUri = 'http://localhost:3000', username, organizationId, organizationName, token: verifyToken } = await req.json();
+
+    if (!code) {
+      return new Response(JSON.stringify({ error: 'Missing authorization code' }), { status: 400 });
     }
 
+    // Get user info from Google
     const userInfo = await getGoogleUserInfo(code, redirectUri);
     if (!userInfo.email) {
       return new Response(JSON.stringify({ error: 'Failed to fetch user info from Google' }), { status: 400 });
@@ -28,7 +30,10 @@ export async function POST(req) {
         if (!org) {
           return new Response(JSON.stringify({ error: 'Organization not found' }), { status: 404 });
         }
-        // Add verifyToken check if implemented later
+        // Add verifyToken validation if required
+        if (verifyToken && org.verifyToken !== verifyToken) { // Example check
+          return new Response(JSON.stringify({ error: 'Invalid verification token' }), { status: 403 });
+        }
         user = new User({
           username: username || userInfo.email.split('@')[0],
           email: userInfo.email,
@@ -41,16 +46,18 @@ export async function POST(req) {
             organization: organizationId,
             role: 'member',
             name: org.name,
-            joinedAt: now
+            joinedAt: now,
           }],
           lastLogin: now,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         });
       } else {
         // Create new organization
         const organization = new Organization({
           name: organizationName || `${userInfo.given_name}'s Organization`,
+          createdAt: now,
+          updatedAt: now,
         });
         await organization.save();
 
@@ -66,20 +73,22 @@ export async function POST(req) {
             organization: organization._id,
             role: 'owner',
             name: organization.name,
-            joinedAt: now
+            joinedAt: now,
           }],
           lastLogin: now,
           createdAt: now,
-          updatedAt: now
+          updatedAt: now,
         });
       }
       await user.save();
     } else {
+      // Update existing user
       user.lastLogin = now;
       user.updatedAt = now;
       await user.save();
     }
 
+    // Generate JWT
     const token = jwt.sign(
       { userId: user._id.toString(), email: user.email },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -93,12 +102,18 @@ export async function POST(req) {
       family_name: user.family_name,
       username: user.username,
       defaultOrgId: user.defaultOrgId,
-      defaultOrgName: user.defaultOrgName
+      defaultOrgName: user.defaultOrgName,
     };
 
-    return new Response(JSON.stringify({ token, user: minimalUserData }), { status: 200 });
+    return new Response(JSON.stringify({ token, user: minimalUserData, orgId: user.defaultOrgId }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (error) {
     console.error('Sign-in error:', error.stack);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
